@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudStore – Xem file được chia sẻ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.9s linear infinite; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation: fadeUp 0.35s ease forwards; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col">
+
+  <header class="bg-white/80 backdrop-blur border-b border-gray-100 px-6 py-3 flex items-center gap-3">
+    <a href="/login.html" class="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+        <i data-lucide="cloud" class="w-4 h-4 text-white"></i>
+      </div>
+      <span class="font-bold text-base">CloudStore</span>
+    </a>
+    <span class="ml-auto text-xs text-gray-400">File được chia sẻ công khai</span>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center p-6 pt-10">
+    <div class="w-full max-w-3xl">
+
+      <div id="stateLoading" class="flex flex-col items-center justify-center py-24 gap-4">
+        <i data-lucide="loader-2" class="w-8 h-8 text-blue-500 spin"></i>
+        <p class="text-gray-400 text-sm">Đang tải file...</p>
+      </div>
+
+      <div id="stateError" class="hidden text-center py-24">
+        <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="file-x" class="w-8 h-8 text-red-400"></i>
+        </div>
+        <h2 class="text-gray-800 font-bold text-lg mb-2">Không thể truy cập</h2>
+        <p id="errorMsg" class="text-gray-400 text-sm">Link không hợp lệ hoặc đã hết hạn.</p>
+      </div>
+
+      <div id="stateFile" class="hidden fade-up">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div id="fileIconWrap" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-blue-50">
+              <i id="fileIcon" data-lucide="file" class="w-6 h-6 text-blue-600"></i>
+            </div>
+            <div class="min-w-0">
+              <p id="fileName" class="font-semibold text-gray-900 truncate text-base"></p>
+              <p id="fileMeta" class="text-xs text-gray-400 mt-0.5"></p>
+            </div>
+          </div>
+          <a id="downloadBtn" href="#"
+            class="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow transition shrink-0">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i> Tải xuống
+          </a>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-50 bg-gray-50/50">
+            <i data-lucide="eye" class="w-4 h-4 text-gray-400"></i>
+            <span class="text-xs text-gray-500 font-medium">Xem trước</span>
+          </div>
+          <div id="previewWrap" class="flex items-center justify-center p-6" style="min-height:300px;max-height:75vh">
+            <div class="flex flex-col items-center gap-3 text-gray-400">
+              <i data-lucide="loader-2" class="w-6 h-6 spin"></i>
+              <span class="text-sm">Đang tải xem trước...</span>
+            </div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-4">File được chia sẻ qua CloudStore &middot; Không cần đăng nhập để xem</p>
+      </div>
+    </div>
+  </main>
+
+<script>
+  const parts = location.pathname.split('/');
+  const token = parts[parts.length - 1] !== 'share.html' ? parts[parts.length - 1] : new URLSearchParams(location.search).get('token');
+
+  function formatSize(b) {
+    if (!b) return '';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+    return (b/1073741824).toFixed(2) + ' GB';
+  }
+  function getPreviewCat(mime) {
+    if (!mime) return 'other';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime.includes('pdf')) return 'pdf';
+    if (mime.includes('text/')) return 'text';
+    return 'other';
+  }
+  function getFileIcon(mime) {
+    if (!mime) return 'file';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'film';
+    if (mime.startsWith('audio/')) return 'music';
+    if (mime.includes('pdf')) return 'file-text';
+    if (mime.includes('zip')||mime.includes('rar')) return 'archive';
+    return 'file';
+  }
+  function getIconColors(mime) {
+    if (!mime) return ['bg-gray-50','text-gray-400'];
+    if (mime.startsWith('image/')) return ['bg-purple-50','text-purple-500'];
+    if (mime.startsWith('video/')) return ['bg-pink-50','text-pink-500'];
+    if (mime.startsWith('audio/')) return ['bg-yellow-50','text-yellow-500'];
+    if (mime.includes('pdf')) return ['bg-red-50','text-red-500'];
+    return ['bg-blue-50','text-blue-500'];
+  }
+  function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function show(id) {
+    ['stateLoading','stateError','stateFile'].forEach(s =>
+      document.getElementById(s).classList.toggle('hidden', s !== id));
+  }
+
+  async function init() {
+    if (!token || token === 'share.html') {
+      show('stateError');
+      return;
+    }
+    try {
+      const res = await fetch('/api/share/' + token);
+      const data = await res.json();
+      if (!res.ok) { show('stateError'); document.getElementById('errorMsg').textContent = data.message; return; }
+
+      document.getElementById('fileName').textContent = data.file_name;
+      document.title = data.file_name + ' – CloudStore';
+      document.getElementById('fileMeta').textContent = [formatSize(data.file_size), data.mime_type].filter(Boolean).join(' · ');
+
+      const [bg, tc] = getIconColors(data.mime_type);
+      document.getElementById('fileIconWrap').className = `w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bg}`;
+      document.getElementById('fileIcon').setAttribute('data-lucide', getFileIcon(data.mime_type));
+      document.getElementById('fileIcon').className = `w-6 h-6 ${tc}`;
+
+      const dlUrl = '/api/share/' + token + '/download';
+      document.getElementById('downloadBtn').href = dlUrl;
+      document.getElementById('downloadBtn').download = data.file_name;
+
+      show('stateFile');
+      lucide.createIcons();
+      renderPreview(data.mime_type, dlUrl, data.file_name);
+    } catch(e) {
+      show('stateError');
+      document.getElementById('errorMsg').textContent = 'Lỗi kết nối server.';
+    }
+  }
+
+  async function renderPreview(mime, dlUrl, name) {
+    const wrap = document.getElementById('previewWrap');
+    const cat = getPreviewCat(mime);
+    if (cat === 'image') {
+      const img = new Image();
+      img.src = dlUrl;
+      img.alt = name;
+      img.className = 'max-w-full object-contain rounded-lg shadow-sm fade-up';
+      img.style.maxHeight = '70vh';
+      img.onload = () => { wrap.innerHTML=''; wrap.appendChild(img); };
+      img.onerror = () => fallback(wrap, mime, dlUrl);
+    } else if (cat === 'video') {
+      wrap.innerHTML = `<video controls class="max-w-full rounded-lg shadow-sm" style="max-height:70vh"><source src="${dlUrl}" type="${mime}">Trình duyệt không hỗ trợ video.</video>`;
+    } else if (cat === 'audio') {
+      wrap.innerHTML = `<div class="flex flex-col items-center gap-5 py-8 w-full max-w-sm"><div class="w-20 h-20 rounded-2xl bg-yellow-50 flex items-center justify-center"><i data-lucide="music" class="w-10 h-10 text-yellow-400"></i></div><p class="text-sm text-gray-700 font-medium text-center">${escHtml(name)}</p><audio controls class="w-full"><source src="${dlUrl}" type="${mime}"></audio></div>`;
+      lucide.createIcons();
+    } else if (cat === 'pdf') {
+      wrap.style.padding = '0'; wrap.style.minHeight = '75vh';
+      wrap.innerHTML = `<iframe src="${dlUrl}" class="w-full border-0" style="height:75vh"></iframe>`;
+    } else if (cat === 'text') {
+      try {
+        const r = await fetch(dlUrl);
+        const txt = await r.text();
+        wrap.innerHTML = `<pre class="w-full text-xs text-gray-700 overflow-auto bg-gray-50 p-4 rounded-xl text-left" style="max-height:65vh;white-space:pre-wrap">${escHtml(txt.slice(0,20000))}</pre>`;
+      } catch { fallback(wrap, mime, dlUrl); }
+    } else {
+      fallback(wrap, mime, dlUrl);
+    }
+  }
+
+  function fallback(wrap, mime, dlUrl) {
+    wrap.innerHTML = `<div class="flex flex-col items-center gap-4 py-8 text-center"><div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center"><i data-lucide="file" class="w-8 h-8 text-gray-400"></i></div><p class="text-gray-500 text-sm">Không thể xem trước loại file này</p><a href="${dlUrl}" download class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><i data-lucide="download" class="w-4 h-4"></i> Tải về để mở</a></div>`;
+    lucide.createIcons();
+  }
+
+  init();
+  lucide.createIcons();
+</script>
+</body>
+</html>
