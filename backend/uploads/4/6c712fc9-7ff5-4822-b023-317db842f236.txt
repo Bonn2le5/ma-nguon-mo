@@ -1,0 +1,81 @@
+$cat_name = $terms ? $terms[0]->name: 0
+$downloads = get_post_meta(get_the_ID(), 'game_downloads', true) ?: 0
+$icon = get_term_meta($cat->term_id, 'category_icon', true) ?: 0
+$rating = get_post_meta(get_the_ID(), 'game_rating', true) ?: 0
+$size = get_post_meta(get_the_ID(), 'software_size', true) ?: 0
+$version = get_post_meta(get_the_ID(), 'software_version', true) ?: 0
+* Template Name: 0
+-webkit-box-orient: 0
+-webkit-line-clamp: 0
+.category-card: 0
+.guide-card: 0
+.hero-btn: 0
+.hero-section: 0
+.item-badge.hot { background: 0
+.item-badge.new { background: 0
+.item-card: 0
+.view-all-btn: 0
+<?php else: 0
+<?php foreach ($game_categories as $cat): 0
+<?php foreach ($software_categories as $cat): 0
+<?php if (!empty($game_categories)): 0
+<?php if (!empty($software_categories)): 0
+<?php if ($badge): 0
+<?php if ($latest_games->have_posts()): 0
+<?php if ($latest_guides->have_posts()): 0
+<?php if ($latest_software->have_posts()): 0
+<?php if (has_post_thumbnail()): 0
+<?php while ($latest_games->have_posts()): 0
+<?php while ($latest_guides->have_posts()): 0
+<?php while ($latest_software->have_posts()): 0
+<a href="/blog" class="view-all-btn" style="background: 0
+<a href="/software" class="view-all-btn" style="background: 0
+<div class="item-thumbnail" style="background: 0
+<div style="font-size: 0
+<div style="text-align: 0
+<span class="item-category" style="color: 0
+<span>👁️ <?php echo get_post_meta(get_the_ID(), 'post_views', true) ?: 0
+@media (max-width: 0
+align-items: 0
+background: 0
+border: 0
+border-radius: 0
+border-top: 0
+bottom: 0
+box-shadow: 0
+box-sizing: 0
+color: 0
+content: 0
+display: 0
+filter: 0
+flex-wrap: 0
+font-family: 0
+font-size: 0
+font-weight: 0
+gap: 0
+grid-template-columns: 0
+height: 0
+if (!$icon) $icon = isset($default_icons[$cat->slug]) ? $default_icons[$cat->slug]: 0
+justify-content: 0
+left: 0
+line-height: 0
+margin: 0
+margin-bottom: 0
+margin-top: 0
+max-width: 0
+object-fit: 0
+opacity: 0
+overflow: 0
+padding: 0
+padding-top: 0
+position: 0
+right: 0
+text-align: 0
+text-decoration: 0
+text-shadow: 0
+text-transform: 0
+top: 0
+transform: 0
+transition: 0
+width: 0
+z-index: 0

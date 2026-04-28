@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - CloudStore</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-50 py-10">
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-blue-100 opacity-40"></div>
+        <div class="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-sky-100 opacity-40"></div>
+    </div>
+
+    <div class="relative w-full max-w-md px-6 animate-fadeIn">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 shadow-lg mb-4">
+                <i data-lucide="cloud" class="w-9 h-9 text-white"></i>
+            </div>
+            <h1 class="text-gray-900 text-2xl font-bold mt-2">CloudStore</h1>
+            <p class="text-gray-500 mt-1 text-sm">Tạo tài khoản mới</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+
+            <!-- Success -->
+            <div id="successBox" class="hidden text-center py-6">
+                <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="check-circle-2" class="w-9 h-9 text-green-500"></i>
+                </div>
+                <h3 class="text-gray-800 mb-2 text-lg font-semibold">Đăng ký thành công!</h3>
+                <p class="text-gray-500 text-sm">Tài khoản đã được tạo. Đang chuyển đến trang đăng nhập...</p>
+            </div>
+
+            <!-- Form -->
+            <div id="formBox">
+                <h2 class="text-gray-800 mb-1 text-xl font-semibold">Đăng ký tài khoản</h2>
+                <p class="text-gray-500 text-sm mb-6">Điền thông tin để tạo tài khoản</p>
+
+                <div id="errorAlert" class="hidden flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-5 text-sm">
+                    <i data-lucide="alert-circle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                    <span id="errorText"></span>
+                </div>
+
+                <form id="registerForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1.5 font-medium">Tên đăng nhập <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="text" id="username" placeholder="Tối thiểu 3 ký tự..."
+                                class="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1.5 font-medium">Email <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="email" id="email" placeholder="example@email.com"
+                                class="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1.5 font-medium">Mật khẩu <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="password" id="password" placeholder="Tối thiểu 6 ký tự..."
+                                class="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                            <button type="button" onclick="toggleVis('password',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <!-- Strength bar -->
+                        <div id="strengthBox" class="hidden mt-2">
+                            <div class="flex gap-1 mb-1">
+                                <div id="b1" class="h-1 flex-1 rounded-full bg-gray-200"></div>
+                                <div id="b2" class="h-1 flex-1 rounded-full bg-gray-200"></div>
+                                <div id="b3" class="h-1 flex-1 rounded-full bg-gray-200"></div>
+                                <div id="b4" class="h-1 flex-1 rounded-full bg-gray-200"></div>
+                            </div>
+                            <p class="text-xs text-gray-500">Độ mạnh: <span id="strengthLabel" class="font-medium"></span></p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1.5 font-medium">Xác nhận mật khẩu <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="password" id="confirm" placeholder="Nhập lại mật khẩu..."
+                                class="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                            <button type="button" onclick="toggleVis('confirm',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <p id="matchErr" class="hidden text-xs text-red-500 mt-1">Mật khẩu không khớp</p>
+                    </div>
+
+                    <button type="submit" id="submitBtn"
+                        class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 mt-2 transition">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> Tạo tài khoản
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center text-sm text-gray-500">
+                    Đã có tài khoản?
+                    <a href="login.html" class="text-blue-600 hover:text-blue-700 font-medium">Đăng nhập</a>
+                </div>
+            </div>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-5">Powered by Node.js · Express · MySQL</p>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const passInput   = document.getElementById('password');
+        const confirmInput= document.getElementById('confirm');
+        const submitBtn   = document.getElementById('submitBtn');
+        const errAlert    = document.getElementById('errorAlert');
+        const errText     = document.getElementById('errorText');
+
+        function toggleVis(id, btn) {
+            const el = document.getElementById(id);
+            el.type = el.type === 'password' ? 'text' : 'password';
+            btn.querySelector('i').setAttribute('data-lucide', el.type === 'password' ? 'eye' : 'eye-off');
+            lucide.createIcons();
+        }
+
+        // Strength bar
+        passInput.addEventListener('input', () => {
+            const p = passInput.value;
+            const box = document.getElementById('strengthBox');
+            if (!p) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            let score = 0;
+            if (p.length >= 6) score++;
+            if (p.length >= 10) score++;
+            if (/[A-Z]/.test(p) && /[0-9]/.test(p)) score++;
+            if (/[^A-Za-z0-9]/.test(p)) score++;
+            const labels = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
+            const colors = ['', 'bg-red-400', 'bg-yellow-400', 'bg-blue-400', 'bg-green-400'];
+            document.getElementById('strengthLabel').textContent = labels[score];
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById('b' + i).className = `h-1 flex-1 rounded-full ${i <= score ? colors[score] : 'bg-gray-200'}`;
+            }
+        });
+
+        // Confirm match
+        confirmInput.addEventListener('input', () => {
+            const no = confirmInput.value && confirmInput.value !== passInput.value;
+            document.getElementById('matchErr').classList.toggle('hidden', !no);
+            confirmInput.classList.toggle('border-red-300', no);
+        });
+
+        function showError(msg) {
+            errText.textContent = msg;
+            errAlert.classList.remove('hidden');
+        }
+
+        function setLoading(on) {
+            submitBtn.disabled = on;
+            submitBtn.innerHTML = on
+                ? '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Đang tạo tài khoản...'
+                : '<i data-lucide="user-plus" class="w-4 h-4"></i> Tạo tài khoản';
+            lucide.createIcons();
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errAlert.classList.add('hidden');
+
+            const u = document.getElementById('username').value.trim();
+            const em = document.getElementById('email').value.trim();
+            const p = passInput.value;
+            const c = confirmInput.value;
+
+            // Validation
+            if (!u || !em || !p || !c) { showError('Vui lòng điền đầy đủ thông tin.'); return; }
+            if (u.length < 3) { showError('Tên đăng nhập phải có ít nhất 3 ký tự.'); return; }
+            if (p.length < 6) { showError('Mật khẩu phải có ít nhất 6 ký tự.'); return; }
+            if (p !== c) { showError('Mật khẩu xác nhận không khớp.'); return; }
+            if (!/\S+@\S+\.\S+/.test(em)) { showError('Email không đúng định dạng.'); return; }
+
+            setLoading(true);
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, email: em, password: p })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showError(data.message || 'Đăng ký thất bại.');
+                    setLoading(false);
+                    return;
+                }
+
+                // Thành công
+                document.getElementById('formBox').classList.add('hidden');
+                document.getElementById('successBox').classList.remove('hidden');
+                lucide.createIcons();
+                setTimeout(() => window.location.href = 'login.html', 2000);
+
+            } catch (err) {
+                showError('Không thể kết nối tới server.');
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>

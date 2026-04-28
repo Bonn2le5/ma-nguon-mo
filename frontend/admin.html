@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản trị - CloudStore</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="flex h-screen">
+
+    <!-- SIDEBAR -->
+    <div class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                    <i data-lucide="cloud" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h2 class="text-gray-900 font-bold">CloudStore</h2>
+                    <p class="text-xs text-gray-500">Admin Panel</p>
+                </div>
+            </div>
+        </div>
+        <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+            <button onclick="changeTab('dashboard')" id="tab-dashboard" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white bg-blue-600">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Tổng quan
+            </button>
+            <button onclick="changeTab('users')" id="tab-users" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <i data-lucide="users" class="w-4 h-4"></i> Quản lý người dùng
+            </button>
+            <button onclick="changeTab('storage')" id="tab-storage" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <i data-lucide="hard-drive" class="w-4 h-4"></i> Dung lượng
+            </button>
+            <button onclick="changeTab('activity')" id="tab-activity" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <i data-lucide="activity" class="w-4 h-4"></i> Nhật ký hoạt động
+            </button>
+        </nav>
+        <div class="p-4 border-t border-gray-100 space-y-1">
+            <a href="file.html" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg">
+                <i data-lucide="folder" class="w-4 h-4"></i> Về trang file
+            </a>
+            <button onclick="logout()" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
+                <i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="flex-1 overflow-auto">
+        <!-- Toasts -->
+        <div id="toastOk" class="hidden fixed top-5 right-5 z-[100] flex items-center gap-2 bg-green-500 text-white px-4 py-3 rounded-xl shadow-xl animate-fadeIn text-sm font-medium">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i><span id="toastOkMsg"></span>
+        </div>
+        <div id="toastErr" class="hidden fixed top-5 right-5 z-[100] flex items-center gap-2 bg-red-500 text-white px-4 py-3 rounded-xl shadow-xl animate-fadeIn text-sm font-medium">
+            <i data-lucide="x-circle" class="w-4 h-4"></i><span id="toastErrMsg"></span>
+        </div>
+
+        <div class="p-6">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h1 id="pageTitle" class="text-gray-900 text-2xl font-bold">Tổng quan</h1>
+                    <p class="text-gray-500 text-sm mt-0.5">CloudStore · Node.js + Express + MySQL</p>
+                </div>
+                <div class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-xs text-green-700 font-medium">Hệ thống đang hoạt động</span>
+                </div>
+            </div>
+
+            <!-- Stats (luôn hiện) -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+                    <div class="w-11 h-11 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0"><i data-lucide="users" class="w-5 h-5 text-white"></i></div>
+                    <div><p class="text-xs text-gray-500">Tổng người dùng</p><p id="s1" class="text-2xl font-bold text-gray-900">—</p><p id="s1b" class="text-xs text-gray-400 mt-0.5">—</p></div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+                    <div class="w-11 h-11 rounded-xl bg-purple-500 flex items-center justify-center flex-shrink-0"><i data-lucide="hard-drive" class="w-5 h-5 text-white"></i></div>
+                    <div><p class="text-xs text-gray-500">Đã sử dụng</p><p id="s2" class="text-2xl font-bold text-gray-900">—</p><p id="s2b" class="text-xs text-gray-400 mt-0.5">—</p></div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+                    <div class="w-11 h-11 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0"><i data-lucide="database" class="w-5 h-5 text-white"></i></div>
+                    <div><p class="text-xs text-gray-500">Còn trống</p><p id="s3" class="text-2xl font-bold text-gray-900">—</p><p id="s3b" class="text-xs text-gray-400 mt-0.5">—</p></div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+                    <div class="w-11 h-11 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0"><i data-lucide="upload-cloud" class="w-5 h-5 text-white"></i></div>
+                    <div><p class="text-xs text-gray-500">Upload hôm nay</p><p id="s4" class="text-2xl font-bold text-gray-900">—</p><p class="text-xs text-gray-400 mt-0.5">lượt upload</p></div>
+                </div>
+            </div>
+
+            <!-- DASHBOARD TAB -->
+            <div id="dashboardTab" class="space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4">Dung lượng theo người dùng</h3>
+                        <div style="height:220px"><canvas id="cUsers"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4">Phân bổ loại file</h3>
+                        <div style="height:220px"><canvas id="cType"></canvas></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">Hoạt động 7 ngày gần nhất</h3>
+                    <div style="height:160px"><canvas id="cActivity"></canvas></div>
+                </div>
+            </div>
+
+            <!-- USERS TAB -->
+            <div id="usersTab" class="hidden">
+                <div class="bg-white rounded-xl border border-gray-200">
+                    <div class="p-5 border-b border-gray-100">
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <div class="relative flex-1 min-w-[180px]">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                                <input id="searchUser" type="text" placeholder="Tên đăng nhập, email..."
+                                    class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <select id="filterRole" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="all">Tất cả vai trò</option>
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                            </select>
+                            <select id="filterStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="all">Tất cả trạng thái</option>
+                                <option value="active">Hoạt động</option>
+                                <option value="disabled">Vô hiệu</option>
+                            </select>
+                            <select id="sortUser" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="newest">Mới nhất</option>
+                                <option value="oldest">Cũ nhất</option>
+                                <option value="usage_desc">Dùng nhiều nhất</option>
+                                <option value="usage_asc">Dùng ít nhất</option>
+                            </select>
+                            <span id="userCount" class="text-xs text-gray-400">—</span>
+                            <button onclick="openAddUser()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium ml-auto">
+                                <i data-lucide="user-plus" class="w-4 h-4"></i> Thêm người dùng
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-100">
+                                    <th class="text-left py-3 px-4 text-xs text-gray-500 font-semibold">Người dùng</th>
+                                    <th class="text-left py-3 px-4 text-xs text-gray-500 font-semibold hidden md:table-cell">Vai trò</th>
+                                    <th class="text-left py-3 px-4 text-xs text-gray-500 font-semibold hidden lg:table-cell">Dung lượng</th>
+                                    <th class="text-left py-3 px-4 text-xs text-gray-500 font-semibold hidden xl:table-cell">Ngày tạo</th>
+                                    <th class="text-center py-3 px-4 text-xs text-gray-500 font-semibold">Trạng thái</th>
+                                    <th class="text-right py-3 px-4 text-xs text-gray-500 font-semibold">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userBody"><tr><td colspan="6" class="text-center py-10 text-gray-400 text-sm">Đang tải...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STORAGE TAB -->
+            <div id="storageTab" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4">Dung lượng đã dùng (GB)</h3>
+                        <div style="height:240px"><canvas id="cStorageDetail"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4">Quota vs Đã dùng</h3>
+                        <div style="height:240px"><canvas id="cQuotaVsUsed"></canvas></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4">Chi tiết từng người dùng</h3>
+                    <div id="storageList" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- ACTIVITY TAB -->
+            <div id="activityTab" class="hidden">
+                <div class="bg-white rounded-xl border border-gray-200">
+                    <div class="p-5 border-b border-gray-100 flex flex-wrap gap-3 items-center">
+                        <div class="relative flex-1 min-w-[200px]">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                            <input id="searchLog" type="text" placeholder="Tìm theo file, user..."
+                                class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <select id="logLimit" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="20">20 gần nhất</option>
+                            <option value="50" selected>50 gần nhất</option>
+                            <option value="100">100 gần nhất</option>
+                        </select>
+                        <button onclick="loadLogs()" class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Tải lại
+                        </button>
+                        <span id="logCount" class="text-xs text-gray-400">—</span>
+                    </div>
+                    <div id="logList" class="p-4 space-y-2 max-h-[520px] overflow-y-auto">
+                        <p class="text-center text-gray-400 text-sm py-8">Đang tải...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add User -->
+<div id="mAddUser" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fadeIn" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5 text-blue-600"></i><h3 class="font-semibold text-gray-900">Thêm người dùng mới</h3></div>
+            <button onclick="closeM('mAddUser')" class="p-1 hover:bg-gray-100 rounded-lg"><i data-lucide="x" class="w-4 h-4 text-gray-400"></i></button>
+        </div>
+        <form id="fAddUser" class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-xs text-gray-600 mb-1 font-medium">Tên đăng nhập *</label>
+                    <input type="text" id="au_name" required placeholder="username" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs text-gray-600 mb-1 font-medium">Email *</label>
+                    <input type="email" id="au_email" required placeholder="email@example.com" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            </div>
+            <div><label class="block text-xs text-gray-600 mb-1 font-medium">Mật khẩu *</label>
+                <div class="relative">
+                    <input type="password" id="au_pass" required placeholder="Tối thiểu 6 ký tự" class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="button" onclick="toggleVis('au_pass',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-xs text-gray-600 mb-1 font-medium">Vai trò</label>
+                    <select id="au_role" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="user">User</option><option value="admin">Admin</option></select></div>
+                <div><label class="block text-xs text-gray-600 mb-1 font-medium">Quota</label>
+                    <select id="au_quota" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="5">5 GB</option><option value="10" selected>10 GB</option><option value="20">20 GB</option><option value="50">50 GB</option></select></div>
+            </div>
+            <div id="au_err" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"></div>
+            <div class="flex gap-3 pt-1">
+                <button type="button" onclick="closeM('mAddUser')" class="flex-1 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Hủy</button>
+                <button type="submit" id="au_btn" class="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2">Thêm người dùng</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit User -->
+<div id="mEditUser" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-fadeIn p-6" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2"><i data-lucide="edit-2" class="w-5 h-5 text-blue-600"></i><h3 class="font-semibold text-gray-900">Chỉnh sửa người dùng</h3></div>
+            <button onclick="closeM('mEditUser')" class="p-1 hover:bg-gray-100 rounded-lg"><i data-lucide="x" class="w-4 h-4 text-gray-400"></i></button>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">User: <span id="eu_name" class="font-semibold text-gray-800"></span></p>
+        <div class="space-y-3 mb-5">
+            <div><label class="block text-xs text-gray-600 mb-1 font-medium">Vai trò</label>
+                <select id="eu_role" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="user">User</option><option value="admin">Admin</option></select></div>
+            <div><label class="block text-xs text-gray-600 mb-1 font-medium">Quota</label>
+                <select id="eu_quota" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="5">5 GB</option><option value="10">10 GB</option><option value="20">20 GB</option><option value="50">50 GB</option></select></div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeM('mEditUser')" class="flex-1 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Hủy</button>
+            <button onclick="saveEdit()" class="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Lưu thay đổi</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Reset Password -->
+<div id="mResetPass" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-fadeIn p-6" onclick="event.stopPropagation()">
+        <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="key" class="w-6 h-6 text-orange-500"></i>
+        </div>
+        <h3 class="text-gray-900 text-center font-semibold mb-1">Reset mật khẩu</h3>
+        <p class="text-gray-500 text-sm text-center mb-4">User: <span id="rp_name" class="font-semibold text-gray-800"></span></p>
+        <div class="mb-3">
+            <label class="block text-xs text-gray-600 mb-1 font-medium">Mật khẩu mới *</label>
+            <div class="relative">
+                <input type="password" id="rp_pass" placeholder="Tối thiểu 6 ký tự"
+                    class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <button type="button" onclick="toggleVis('rp_pass',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><i data-lucide="eye" class="w-4 h-4"></i></button>
+            </div>
+        </div>
+        <div id="rp_err" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs mb-3"></div>
+        <div class="flex gap-3">
+            <button onclick="closeM('mResetPass')" class="flex-1 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Hủy</button>
+            <button onclick="doResetPass()" class="flex-1 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium">Reset mật khẩu</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Delete User -->
+<div id="mDelUser" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-fadeIn p-6" onclick="event.stopPropagation()">
+        <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+        </div>
+        <h3 class="text-gray-900 text-center font-semibold mb-2">Xóa tài khoản</h3>
+        <p class="text-gray-500 text-sm text-center mb-5">Xóa tài khoản <span id="du_name" class="font-semibold text-gray-800"></span>? Toàn bộ file sẽ bị xóa vĩnh viễn.</p>
+        <div class="flex gap-3">
+            <button onclick="closeM('mDelUser')" class="flex-1 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Hủy</button>
+            <button onclick="doDeleteUser()" class="flex-1 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Xóa</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token || localStorage.getItem('role') !== 'admin') window.location.href = 'login.html';
+
+let allUsers = [], selId = null;
+const charts = {};
+
+// ===== API =====
+async function api(url, o = {}) {
+    const r = await fetch(url, { ...o, headers: { 'Authorization': 'Bearer ' + token, ...(o.headers||{}) } });
+    if (r.status === 401) { localStorage.clear(); window.location.href = 'login.html'; }
+    return r;
+}
+
+// ===== STATS =====
+async function loadStats() {
+    try {
+        const r = await api('/api/admin/stats');
+        const d = await r.json();
+        document.getElementById('s1').textContent = d.total_users || 0;
+        document.getElementById('s1b').textContent = `${d.active_users||0} đang hoạt động`;
+        document.getElementById('s2').textContent = fmtSz(d.used_storage||0);
+        document.getElementById('s2b').textContent = `/ ${fmtSz(d.total_storage||0)} tổng`;
+        const free = (d.total_storage||0)-(d.used_storage||0);
+        const fp = d.total_storage ? Math.round(free/d.total_storage*100) : 0;
+        document.getElementById('s3').textContent = fmtSz(free);
+        document.getElementById('s3b').textContent = `${fp}% còn trống`;
+        document.getElementById('s4').textContent = d.today_activity||0;
+    } catch(e) {}
+}
+
+// ===== USERS =====
+async function loadUsers() {
+    const r = await api('/api/admin/users');
+    allUsers = await r.json();
+    applyFilter();
+}
+
+function applyFilter() {
+    const q = document.getElementById('searchUser').value.toLowerCase();
+    const role = document.getElementById('filterRole').value;
+    const st = document.getElementById('filterStatus').value;
+    const sort = document.getElementById('sortUser').value;
+    let f = allUsers.filter(u => {
+        const mq = !q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+        const mr = role==='all'||u.role===role;
+        const ms = st==='all'||(st==='active'&&u.is_active)||(st==='disabled'&&!u.is_active);
+        return mq&&mr&&ms;
+    });
+    if (sort==='newest') f.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    else if (sort==='oldest') f.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    else if (sort==='usage_desc') f.sort((a,b)=>(b.used_space||0)-(a.used_space||0));
+    else if (sort==='usage_asc') f.sort((a,b)=>(a.used_space||0)-(b.used_space||0));
+    document.getElementById('userCount').textContent = `${f.length} người dùng`;
+    renderUsers(f);
+}
+
+function renderUsers(users) {
+    const tb = document.getElementById('userBody');
+    if (!users.length) { tb.innerHTML='<tr><td colspan="6" class="text-center py-10 text-gray-400 text-sm">Không tìm thấy</td></tr>'; return; }
+    tb.innerHTML = users.map(u => {
+        const used=u.used_space||0, quota=u.quota||1;
+        const pct=Math.min(used/quota*100,100).toFixed(0);
+        const near=pct>80, isAdm=u.role==='admin', act=u.is_active;
+        const color=near?'bg-red-500':pct>50?'bg-yellow-400':'bg-blue-500';
+        return `<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <td class="py-3 px-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full ${isAdm?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'} flex items-center justify-center text-sm font-bold flex-shrink-0">${u.username[0].toUpperCase()}</div>
+                    <div><p class="text-sm text-gray-800 font-medium">${u.username}</p><p class="text-xs text-gray-400">${u.email}</p></div>
+                </div>
+            </td>
+            <td class="py-3 px-4 hidden md:table-cell"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${isAdm?'bg-purple-100 text-purple-700':'bg-gray-100 text-gray-600'}">${isAdm?'👑 Admin':'User'}</span></td>
+            <td class="py-3 px-4 hidden lg:table-cell">
+                <div class="min-w-[140px]">
+                    <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">${fmtSz(used)} / ${fmtSz(quota)}</span><span class="${near?'text-red-500 font-semibold':'text-gray-400'}">${pct}%</span></div>
+                    <div class="h-1.5 bg-gray-200 rounded-full w-36"><div class="h-1.5 rounded-full ${color}" style="width:${pct}%"></div></div>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-xs text-gray-500 hidden xl:table-cell">${fmtDt(u.created_at)}</td>
+            <td class="py-3 px-4 text-center"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${act?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}"><span class="w-1.5 h-1.5 rounded-full ${act?'bg-green-500':'bg-red-500'}"></span>${act?'Hoạt động':'Vô hiệu'}</span></td>
+            <td class="py-3 px-4">
+                <div class="flex items-center justify-end gap-1">
+                    <button onclick="openEditUser(${u.id},'${u.username}','${u.role}',${Math.round(quota/1073741824)})" class="p-1.5 rounded-lg hover:bg-blue-100 text-gray-500 hover:text-blue-600" title="Chỉnh sửa"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+                    <button onclick="openResetPass(${u.id},'${u.username}')" class="p-1.5 rounded-lg hover:bg-orange-100 text-gray-500 hover:text-orange-600" title="Reset mật khẩu"><i data-lucide="key" class="w-3.5 h-3.5"></i></button>
+                    <button onclick="toggleSt(${u.id},${act?1:0})" class="p-1.5 rounded-lg hover:bg-yellow-100 text-gray-500 hover:text-yellow-600" title="${act?'Vô hiệu hóa':'Kích hoạt'}"><i data-lucide="${act?'user-x':'user-check'}" class="w-3.5 h-3.5"></i></button>
+                    <button onclick="openDel(${u.id},'${u.username}')" ${isAdm?'disabled':''} class="p-1.5 rounded-lg hover:bg-red-100 text-gray-500 hover:text-red-600 disabled:opacity-30" title="Xóa"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+['searchUser','filterRole','filterStatus','sortUser'].forEach(id => {
+    document.getElementById(id).addEventListener('input', applyFilter);
+    document.getElementById(id).addEventListener('change', applyFilter);
+});
+
+// ===== TOGGLE STATUS =====
+async function toggleSt(id, cur) {
+    const r = await api('/api/admin/users/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({is_active: cur?0:1}) });
+    if (r.ok) { toast(cur?'Đã vô hiệu hóa':'Đã kích hoạt'); await loadUsers(); await loadStats(); }
+}
+
+// ===== EDIT USER =====
+function openEditUser(id, name, role, qGB) {
+    selId=id;
+    document.getElementById('eu_name').textContent = name;
+    document.getElementById('eu_role').value = role;
+    const opts=[5,10,20,50];
+    document.getElementById('eu_quota').value = opts.reduce((p,c)=>Math.abs(c-qGB)<Math.abs(p-qGB)?c:p);
+    openM('mEditUser');
+}
+async function saveEdit() {
+    const r = await api('/api/admin/users/'+selId, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({role:document.getElementById('eu_role').value, quota:Number(document.getElementById('eu_quota').value)}) });
+    if (r.ok) { toast('Cập nhật thành công'); closeM('mEditUser'); await loadUsers(); await loadStats(); }
+}
+
+// ===== RESET PASSWORD =====
+function openResetPass(id, name) {
+    selId=id;
+    document.getElementById('rp_name').textContent = name;
+    document.getElementById('rp_pass').value = '';
+    document.getElementById('rp_err').classList.add('hidden');
+    openM('mResetPass');
+}
+async function doResetPass() {
+    const p = document.getElementById('rp_pass').value.trim();
+    const err = document.getElementById('rp_err');
+    if (!p || p.length<6) { err.textContent='Mật khẩu phải có ít nhất 6 ký tự'; err.classList.remove('hidden'); return; }
+    const r = await api('/api/admin/users/'+selId+'/reset-password', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({new_password:p}) });
+    const d = await r.json();
+    if (r.ok) { toast('✅ Reset mật khẩu thành công'); closeM('mResetPass'); }
+    else { err.textContent=d.message; err.classList.remove('hidden'); }
+}
+
+// ===== ADD USER =====
+function openAddUser() {
+    document.getElementById('fAddUser').reset();
+    document.getElementById('au_err').classList.add('hidden');
+    openM('mAddUser');
+}
+document.getElementById('fAddUser').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn=document.getElementById('au_btn');
+    btn.innerHTML='<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+    btn.disabled=true;
+    const b={username:document.getElementById('au_name').value.trim(),email:document.getElementById('au_email').value.trim(),password:document.getElementById('au_pass').value,role:document.getElementById('au_role').value,quota:Number(document.getElementById('au_quota').value)};
+    const r=await api('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+    const d=await r.json();
+    if (r.ok) { toast(`Tạo "${b.username}" thành công`); closeM('mAddUser'); await loadUsers(); await loadStats(); }
+    else { document.getElementById('au_err').textContent=d.message; document.getElementById('au_err').classList.remove('hidden'); }
+    btn.innerHTML='Thêm người dùng'; btn.disabled=false;
+});
+
+// ===== DELETE USER =====
+function openDel(id, name) { selId=id; document.getElementById('du_name').textContent=name; openM('mDelUser'); }
+async function doDeleteUser() {
+    const r=await api('/api/admin/users/'+selId,{method:'DELETE'});
+    const d=await r.json();
+    if (r.ok) { toast('Đã xóa tài khoản'); closeM('mDelUser'); await loadUsers(); await loadStats(); }
+    else toastErr(d.message);
+}
+
+// ===== LOGS =====
+async function loadLogs() {
+    const lim=document.getElementById('logLimit').value;
+    const q=document.getElementById('searchLog').value.trim();
+    const r=await api(`/api/admin/logs?limit=${lim}&search=${encodeURIComponent(q)}`);
+    const logs=await r.json();
+    document.getElementById('logCount').textContent=`${logs.length} bản ghi`;
+    const mI=m=>{if(!m)return'📄';if(m.startsWith('image/'))return'🖼️';if(m.startsWith('video/'))return'🎬';if(m.startsWith('audio/'))return'🎵';if(m==='application/pdf')return'📕';if(m.includes('zip'))return'🗜️';return'📄';};
+    const el=document.getElementById('logList');
+    if(!logs.length){el.innerHTML='<p class="text-center text-gray-400 text-sm py-8">Chưa có hoạt động nào</p>';return;}
+    el.innerHTML=logs.map(l=>`
+        <div class="flex items-center gap-4 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+            <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold flex-shrink-0">${l.username[0].toUpperCase()}</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-800 truncate"><span class="font-semibold text-blue-700">${l.username}</span><span class="text-gray-400 mx-1">·</span><span>${mI(l.mime_type)} ${l.original_name}</span></p>
+                <p class="text-xs text-gray-400 mt-0.5">${fmtSz(l.file_size)} · ${l.folder_path}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium flex-shrink-0">Upload</span>
+            <span class="text-xs text-gray-400 hidden sm:block flex-shrink-0 text-right">${fmtDt(l.created_at)}</span>
+        </div>`).join('');
+}
+document.getElementById('searchLog').addEventListener('input', loadLogs);
+document.getElementById('logLimit').addEventListener('change', loadLogs);
+
+// ===== CHARTS =====
+function dc(n){if(charts[n]){charts[n].destroy();delete charts[n];}}
+
+function initDashboard() {
+    dc('u');dc('t');dc('a');
+    charts.u=new Chart(document.getElementById('cUsers').getContext('2d'),{type:'bar',data:{labels:allUsers.map(u=>u.username),datasets:[{label:'Đã dùng (GB)',data:allUsers.map(u=>((u.used_space||0)/1073741824).toFixed(2)),backgroundColor:allUsers.map((_,i)=>`hsl(${200+i*35},65%,58%)`),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+    charts.t=new Chart(document.getElementById('cType').getContext('2d'),{type:'doughnut',data:{labels:['Hình ảnh','Tài liệu','Video','Âm thanh','Khác'],datasets:[{data:[35,28,18,10,9],backgroundColor:['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+    const days=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'});});
+    charts.a=new Chart(document.getElementById('cActivity').getContext('2d'),{type:'line',data:{labels:days,datasets:[{label:'Upload',data:[5,12,8,18,7,14,22],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.4,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+}
+
+function initStorage() {
+    dc('sd');dc('qv');
+    const labels=allUsers.map(u=>u.username);
+    const used=allUsers.map(u=>((u.used_space||0)/1073741824).toFixed(2));
+    const quota=allUsers.map(u=>((u.quota||0)/1073741824).toFixed(0));
+    charts.sd=new Chart(document.getElementById('cStorageDetail').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Đã dùng (GB)',data:used,backgroundColor:'#3b82f6',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+    charts.qv=new Chart(document.getElementById('cQuotaVsUsed').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Quota (GB)',data:quota,backgroundColor:'#e2e8f0',borderRadius:6},{label:'Đã dùng (GB)',data:used,backgroundColor:'#3b82f6',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+    const el=document.getElementById('storageList');
+    el.innerHTML=allUsers.map(u=>{
+        const ub=u.used_space||0,qb=u.quota||1,p=Math.min(ub/qb*100,100).toFixed(0),n=p>80;
+        return `<div class="flex items-center gap-4"><div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">${u.username[0].toUpperCase()}</div><div class="flex-1"><div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-700">${u.username}</span><span class="${n?'text-red-500 font-semibold':'text-gray-400'}">${fmtSz(ub)} / ${fmtSz(qb)} (${p}%)</span></div><div class="h-2 bg-gray-100 rounded-full"><div class="h-2 rounded-full ${n?'bg-red-500':parseInt(p)>50?'bg-yellow-400':'bg-blue-500'}" style="width:${p}%"></div></div></div></div>`;
+    }).join('');
+}
+
+// ===== CHANGE TAB =====
+const titles={dashboard:'Tổng quan',users:'Quản lý người dùng',storage:'Dung lượng',activity:'Nhật ký hoạt động'};
+function changeTab(tab) {
+    ['dashboard','users','storage','activity'].forEach(t=>{
+        document.getElementById(t+'Tab').classList.add('hidden');
+        document.getElementById('tab-'+t).className='w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100';
+    });
+    document.getElementById(tab+'Tab').classList.remove('hidden');
+    document.getElementById('tab-'+tab).className='w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white bg-blue-600';
+    document.getElementById('pageTitle').textContent=titles[tab];
+    lucide.createIcons();
+    if(tab==='dashboard')initDashboard();
+    if(tab==='storage')initStorage();
+    if(tab==='activity')loadLogs();
+}
+
+// ===== MODAL HELPERS =====
+function openM(id){document.getElementById(id).classList.remove('hidden');lucide.createIcons();}
+function closeM(id){document.getElementById(id).classList.add('hidden');selId=null;}
+['mAddUser','mEditUser','mResetPass','mDelUser'].forEach(id=>{
+    document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeM(id);});
+});
+
+// ===== TOGGLE VISIBILITY =====
+function toggleVis(inputId,btn){const i=document.getElementById(inputId);i.type=i.type==='password'?'text':'password';btn.querySelector('i').setAttribute('data-lucide',i.type==='password'?'eye':'eye-off');lucide.createIcons();}
+
+// ===== TOAST =====
+function toast(msg){document.getElementById('toastOkMsg').textContent=msg;const t=document.getElementById('toastOk');t.classList.remove('hidden');lucide.createIcons();setTimeout(()=>t.classList.add('hidden'),3000);}
+function toastErr(msg){document.getElementById('toastErrMsg').textContent=msg;const t=document.getElementById('toastErr');t.classList.remove('hidden');lucide.createIcons();setTimeout(()=>t.classList.add('hidden'),3000);}
+
+// ===== HELPERS =====
+function fmtSz(b){if(!b||b===0)return'0 B';if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(1)+' GB';}
+function fmtDt(s){if(!s)return'—';return new Date(s).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function logout(){localStorage.clear();window.location.href='login.html';}
+
+// ===== INIT =====
+lucide.createIcons();
+Promise.all([loadStats(),loadUsers()]).then(()=>initDashboard());
+</script>
+</body>
+</html>

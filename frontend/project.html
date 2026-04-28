@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects - CloudStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.2s ease forwards; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.8s linear infinite; }
+    .role-badge-owner  { background:#fef3c7; color:#92400e; }
+    .role-badge-editor { background:#dbeafe; color:#1e40af; }
+    .role-badge-viewer { background:#f3f4f6; color:#374151; }
+  </style>
+</head>
+<body class="bg-gray-50">
+<div class="flex h-screen">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <div class="p-4 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <a href="/file.html" class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors">
+          <i data-lucide="cloud" class="w-6 h-6 text-white"></i>
+        </a>
+        <div>
+          <h2 class="text-gray-900 font-bold">CloudStore</h2>
+          <span id="sidebarUsername" class="text-xs text-blue-500 truncate block">...</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 p-3 overflow-y-auto">
+      <a href="/file.html" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 mb-1">
+        <i data-lucide="folder" class="w-4 h-4"></i> Tất cả file
+      </a>
+      <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white bg-blue-600 mb-1">
+        <i data-lucide="layout-grid" class="w-4 h-4"></i> Projects
+      </button>
+    </nav>
+
+    <div class="p-4 border-t border-gray-100">
+      <button onclick="logout()" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- Top bar -->
+    <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2 text-sm">
+        <i data-lucide="layout-grid" class="w-4 h-4 text-blue-600"></i>
+        <span id="headerTitle" class="font-semibold text-gray-800">Projects</span>
+      </div>
+      <button id="btnNewProject" onclick="openCreateModal()"
+        class="hidden flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+        <i data-lucide="plus" class="w-4 h-4"></i> Tạo project
+      </button>
+    </header>
+
+    <!-- Content area — switches between list & detail -->
+    <main class="flex-1 overflow-y-auto p-6">
+
+      <!-- ══ PROJECT LIST VIEW ══ -->
+      <div id="viewList">
+        <div class="flex items-center justify-between mb-5">
+          <h1 class="text-xl font-bold text-gray-900">Tất cả Projects</h1>
+          <button onclick="openCreateModal()"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+            <i data-lucide="plus" class="w-4 h-4"></i> Tạo project
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div id="listLoading" class="flex justify-center py-16">
+          <i data-lucide="loader-2" class="w-6 h-6 text-blue-500 spin"></i>
+        </div>
+
+        <!-- Empty -->
+        <div id="listEmpty" class="hidden text-center py-20">
+          <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="layout-grid" class="w-8 h-8 text-blue-400"></i>
+          </div>
+          <p class="text-gray-500 text-sm">Chưa có project nào. Hãy tạo project đầu tiên!</p>
+        </div>
+
+        <!-- Grid -->
+        <div id="projectGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden"></div>
+      </div>
+
+      <!-- ══ PROJECT DETAIL VIEW ══ -->
+      <div id="viewDetail" class="hidden">
+        <!-- Back button + title -->
+        <div class="flex items-center gap-3 mb-5">
+          <button onclick="backToList()" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <div class="flex-1">
+            <h1 id="detailName" class="text-xl font-bold text-gray-900"></h1>
+            <p id="detailDesc" class="text-sm text-gray-500 mt-0.5"></p>
+          </div>
+          <span id="detailMyRole" class="px-2.5 py-1 rounded-full text-xs font-semibold"></span>
+          <!-- Owner actions -->
+          <div id="ownerActions" class="hidden flex gap-2">
+            <button onclick="openEditModal()" class="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 text-gray-700">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Sửa
+            </button>
+            <button onclick="openDeleteProjectModal()" class="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm hover:bg-red-50 text-red-600">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 bg-gray-100 p-1 rounded-xl mb-5 w-fit">
+          <button id="tab-files" onclick="switchTab('files')"
+            class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white text-blue-600 shadow-sm">
+            <i data-lucide="files" class="w-3.5 h-3.5 inline mr-1"></i> Files
+          </button>
+          <button id="tab-members" onclick="switchTab('members')"
+            class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:text-gray-800">
+            <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i> Thành viên
+          </button>
+        </div>
+
+        <!-- ── FILES TAB ── -->
+        <div id="tabFiles">
+          <!-- Upload bar (editor + owner) -->
+          <div id="uploadBar" class="hidden mb-4">
+            <label class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cursor-pointer w-fit">
+              <i data-lucide="upload" class="w-4 h-4"></i> Tải lên file
+              <input type="file" id="fileInput" class="hidden" multiple onchange="handleUpload(event)">
+            </label>
+          </div>
+
+          <!-- Upload progress -->
+          <div id="uploadProgress" class="hidden mb-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 flex items-center gap-3 text-sm text-blue-700">
+            <i data-lucide="loader-2" class="w-4 h-4 spin"></i>
+            <span id="uploadProgressText">Đang upload...</span>
+          </div>
+
+          <!-- File list -->
+          <div id="filesLoading" class="flex justify-center py-10">
+            <i data-lucide="loader-2" class="w-5 h-5 text-blue-500 spin"></i>
+          </div>
+          <div id="filesEmpty" class="hidden text-center py-14">
+            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <i data-lucide="file-x" class="w-6 h-6 text-gray-400"></i>
+            </div>
+            <p class="text-gray-400 text-sm">Chưa có file nào trong project</p>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-100 overflow-hidden hidden" id="fileTable">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium">Tên file</th>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Kích thước</th>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Tải lên bởi</th>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Ngày</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="fileTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── MEMBERS TAB ── -->
+        <div id="tabMembers" class="hidden">
+          <!-- Add member form (owner only) -->
+          <div id="addMemberForm" class="hidden mb-5 bg-white border border-gray-100 rounded-xl p-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Thêm thành viên</h3>
+            <div class="flex gap-2 flex-wrap">
+              <div class="relative flex-1 min-w-48">
+                <input id="newMemberUsername" type="text" placeholder="Tên đăng nhập..." autocomplete="off"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  oninput="searchUsers(this.value)" onkeydown="handleUserKeydown(event)">
+                <div id="userDropdown" class="hidden fixed bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto" style="min-width:260px"></div>
+              </div>
+              <select id="newMemberRole" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="editor">Chỉnh sửa</option>
+                <option value="viewer">Chỉ xem</option>
+              </select>
+              <button onclick="addMember()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+                Thêm
+              </button>
+            </div>
+          </div>
+
+          <!-- Members list -->
+          <div id="membersLoading" class="flex justify-center py-10">
+            <i data-lucide="loader-2" class="w-5 h-5 text-blue-500 spin"></i>
+          </div>
+          <div class="bg-white rounded-xl border border-gray-100 overflow-hidden hidden" id="memberTable">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium">Thành viên</th>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium">Quyền</th>
+                  <th class="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Tham gia</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="memberTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Create Project -->
+<div id="modalCreate" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-gray-900">Tạo project mới</h3>
+      <button onclick="closeModal('modalCreate')" class="p-1.5 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-gray-600 mb-1 block">Tên project *</label>
+        <input id="createName" type="text" placeholder="Ví dụ: Website Công ty..."
+          class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600 mb-1 block">Mô tả (tùy chọn)</label>
+        <textarea id="createDesc" rows="3" placeholder="Mô tả ngắn về project..."
+          class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal('modalCreate')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="createProject()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Tạo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Project -->
+<div id="modalEdit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-gray-900">Chỉnh sửa project</h3>
+      <button onclick="closeModal('modalEdit')" class="p-1.5 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-gray-600 mb-1 block">Tên project *</label>
+        <input id="editName" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600 mb-1 block">Mô tả</label>
+        <textarea id="editDesc" rows="3" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal('modalEdit')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="saveEdit()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Project -->
+<div id="modalDeleteProject" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+      <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+    </div>
+    <h3 class="text-center font-bold text-gray-900 mb-1">Xóa project?</h3>
+    <p class="text-center text-sm text-gray-500 mb-5">Toàn bộ file và thành viên trong project sẽ bị xóa vĩnh viễn.</p>
+    <div class="flex gap-3">
+      <button onclick="closeModal('modalDeleteProject')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="deleteProject()" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">Xóa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename File -->
+<div id="modalRename" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <h3 class="font-bold text-gray-900 mb-4">Đổi tên file</h3>
+    <input id="renameInput" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+    <div class="flex gap-3">
+      <button onclick="closeModal('modalRename')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="confirmRename()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete File -->
+<div id="modalDeleteFile" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <h3 class="font-bold text-gray-900 mb-2">Xóa file?</h3>
+    <p class="text-sm text-gray-500 mb-5">File "<span id="deleteFileName" class="font-medium text-gray-700"></span>" sẽ bị xóa vĩnh viễn.</p>
+    <div class="flex gap-3">
+      <button onclick="closeModal('modalDeleteFile')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="confirmDeleteFile()" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">Xóa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Role -->
+<div id="modalChangeRole" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <h3 class="font-bold text-gray-900 mb-1">Đổi quyền</h3>
+    <p class="text-sm text-gray-500 mb-4">Thành viên: <span id="changeRoleUsername" class="font-medium text-gray-700"></span></p>
+    <select id="changeRoleSelect" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+      <option value="editor">Chỉnh sửa</option>
+      <option value="viewer">Chỉ xem</option>
+    </select>
+    <div class="flex gap-3">
+      <button onclick="closeModal('modalChangeRole')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="confirmChangeRole()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2 max-w-xs"></div>
+
+<!-- Preview Modal -->
+<div id="modalPreview" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="closePreview()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style="max-height:90vh" onclick="event.stopPropagation()">
+    <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+      <i id="previewIcon" data-lucide="file" class="w-5 h-5 text-blue-500 shrink-0"></i>
+      <p id="previewName" class="text-gray-800 font-semibold text-sm truncate flex-1"></p>
+      <span id="previewSize" class="text-xs text-gray-400 shrink-0"></span>
+      <a id="previewDownload" href="#" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium ml-2">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i> Tải về
+      </a>
+      <button onclick="closePreview()" class="p-1.5 hover:bg-gray-100 rounded-lg ml-1">
+        <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+      </button>
+    </div>
+    <div id="previewBody" class="flex-1 overflow-auto flex items-center justify-center bg-gray-50 rounded-b-2xl p-4" style="min-height:300px;max-height:calc(90vh - 60px)"></div>
+  </div>
+</div>
+
+<script>
+  // ── AUTH ──
+  const token = localStorage.getItem('token');
+  const username = localStorage.getItem('username');
+  if (!token) location.href = '/login.html';
+  document.getElementById('sidebarUsername').textContent = username || 'User';
+
+  async function api(url, opts = {}) {
+    const res = await fetch(url, {
+      ...opts,
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+    });
+    if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; }
+    return res;
+  }
+
+  function logout() { localStorage.clear(); location.href = '/login.html'; }
+
+  // ── TOAST ──
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2 max-w-xs fade-in ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`;
+    t.innerHTML = `<i data-lucide="${type === 'error' ? 'x-circle' : 'check-circle'}" class="w-4 h-4"></i>${msg}`;
+    t.classList.remove('hidden');
+    lucide.createIcons();
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => t.classList.add('hidden'), 3000);
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+  function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+
+  // ── STATE ──
+  let currentProject = null; // full project object
+  let currentTab = 'files';
+  let renameFileId = null;
+  let deleteFileId = null;
+  let changeRoleMemberId = null;
+
+  // ══════════════════════════════════════════════
+  // PROJECT LIST
+  // ══════════════════════════════════════════════
+  async function loadProjects() {
+    document.getElementById('listLoading').classList.remove('hidden');
+    document.getElementById('listEmpty').classList.add('hidden');
+    document.getElementById('projectGrid').classList.add('hidden');
+
+    const res = await api('/api/projects');
+    const projects = await res.json();
+
+    document.getElementById('listLoading').classList.add('hidden');
+
+    if (!projects.length) {
+      document.getElementById('listEmpty').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('projectGrid').classList.remove('hidden');
+    document.getElementById('projectGrid').innerHTML = projects.map(p => {
+      const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[p.my_role] || p.my_role;
+      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role];
+      return `
+      <div onclick="openProject(${p.id})"
+        class="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:border-blue-100 cursor-pointer transition-all fade-in group">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+            <i data-lucide="layout-grid" class="w-5 h-5 text-blue-600"></i>
+          </div>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${roleClass}">${roleLabel}</span>
+        </div>
+        <h3 class="font-semibold text-gray-900 text-sm mb-1 truncate">${escHtml(p.name)}</h3>
+        <p class="text-xs text-gray-400 truncate mb-3">${p.description ? escHtml(p.description) : 'Không có mô tả'}</p>
+        <div class="flex items-center gap-3 text-xs text-gray-400">
+          <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i>${p.member_count} thành viên</span>
+          <span class="flex items-center gap-1"><i data-lucide="files" class="w-3 h-3"></i>${p.file_count} file</span>
+        </div>
+      </div>`;
+    }).join('');
+    lucide.createIcons();
+  }
+
+  function openCreateModal() {
+    document.getElementById('createName').value = '';
+    document.getElementById('createDesc').value = '';
+    openModal('modalCreate');
+    setTimeout(() => document.getElementById('createName').focus(), 100);
+  }
+
+  async function createProject() {
+    const name = document.getElementById('createName').value.trim();
+    const description = document.getElementById('createDesc').value.trim();
+    if (!name) return showToast('Tên project không được trống', 'error');
+
+    const res = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name, description }) });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalCreate');
+    showToast('Tạo project thành công');
+    loadProjects();
+  }
+
+  // ══════════════════════════════════════════════
+  // PROJECT DETAIL
+  // ══════════════════════════════════════════════
+  async function openProject(id) {
+    const res = await api('/api/projects/' + id);
+    if (!res.ok) return showToast('Lỗi tải project', 'error');
+    const p = await res.json();
+    currentProject = p;
+
+    // Update UI
+    document.getElementById('detailName').textContent = p.name;
+    document.getElementById('detailDesc').textContent = p.description || '';
+    document.getElementById('headerTitle').textContent = p.name;
+
+    const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[p.my_role];
+    const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role];
+    const badge = document.getElementById('detailMyRole');
+    badge.textContent = roleLabel;
+    badge.className = `px-2.5 py-1 rounded-full text-xs font-semibold ${roleClass}`;
+
+    // Owner actions
+    const ownerActions = document.getElementById('ownerActions');
+    if (p.my_role === 'owner') ownerActions.classList.remove('hidden');
+    else ownerActions.classList.add('hidden');
+
+    // Upload bar
+    const uploadBar = document.getElementById('uploadBar');
+    if (p.my_role !== 'viewer') uploadBar.classList.remove('hidden');
+    else uploadBar.classList.add('hidden');
+
+    // Add member form
+    const addMemberForm = document.getElementById('addMemberForm');
+    if (p.my_role === 'owner') addMemberForm.classList.remove('hidden');
+    else addMemberForm.classList.add('hidden');
+
+    // Switch view
+    document.getElementById('viewList').classList.add('hidden');
+    document.getElementById('viewDetail').classList.remove('hidden');
+
+    switchTab('files');
+  }
+
+  function backToList() {
+    currentProject = null;
+    document.getElementById('viewDetail').classList.add('hidden');
+    document.getElementById('viewList').classList.remove('hidden');
+    document.getElementById('headerTitle').textContent = 'Projects';
+    loadProjects();
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    ['files', 'members'].forEach(t => {
+      const btn = document.getElementById('tab-' + t);
+      const panel = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (t === tab) {
+        btn.className = 'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white text-blue-600 shadow-sm';
+        panel.classList.remove('hidden');
+      } else {
+        btn.className = 'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:text-gray-800';
+        panel.classList.add('hidden');
+      }
+    });
+    if (tab === 'files') loadFiles();
+    else loadMembers();
+  }
+
+  // ── Edit / Delete project ──
+  function openEditModal() {
+    document.getElementById('editName').value = currentProject.name;
+    document.getElementById('editDesc').value = currentProject.description || '';
+    openModal('modalEdit');
+  }
+  async function saveEdit() {
+    const name = document.getElementById('editName').value.trim();
+    const description = document.getElementById('editDesc').value.trim();
+    if (!name) return showToast('Tên không được trống', 'error');
+    const res = await api('/api/projects/' + currentProject.id, { method: 'PUT', body: JSON.stringify({ name, description }) });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalEdit');
+    currentProject.name = name;
+    currentProject.description = description;
+    document.getElementById('detailName').textContent = name;
+    document.getElementById('detailDesc').textContent = description;
+    document.getElementById('headerTitle').textContent = name;
+    showToast('Đã cập nhật project');
+  }
+
+  function openDeleteProjectModal() { openModal('modalDeleteProject'); }
+  async function deleteProject() {
+    const res = await api('/api/projects/' + currentProject.id, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalDeleteProject');
+    showToast('Đã xóa project');
+    backToList();
+  }
+
+  // ══════════════════════════════════════════════
+  // FILES
+  // ══════════════════════════════════════════════
+  async function loadFiles() {
+    document.getElementById('filesLoading').classList.remove('hidden');
+    document.getElementById('filesEmpty').classList.add('hidden');
+    document.getElementById('fileTable').classList.add('hidden');
+
+    const res = await api('/api/projects/' + currentProject.id + '/files');
+    const files = await res.json();
+
+    document.getElementById('filesLoading').classList.add('hidden');
+    if (!files.length) { document.getElementById('filesEmpty').classList.remove('hidden'); return; }
+
+    document.getElementById('fileTable').classList.remove('hidden');
+    const canEdit = currentProject.my_role !== 'viewer';
+
+    document.getElementById('fileTableBody').innerHTML = files.map(f => `
+      <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors fade-in">
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="${getFileIcon(f.mime_type)}" class="w-4 h-4 ${getFileColor(f.mime_type)} shrink-0"></i>
+            <span class="text-sm text-gray-800 font-medium truncate max-w-xs" title="${escHtml(f.original_name)}">${escHtml(f.original_name)}</span>
+          </div>
+        </td>
+        <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">${formatSize(f.file_size)}</td>
+        <td class="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">${escHtml(f.uploaded_by_name)}</td>
+        <td class="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">${formatDate(f.created_at)}</td>
+        <td class="px-4 py-3">
+          <div class="flex items-center justify-end gap-1">
+            <button onclick="openPreview(${f.id}, '${escAttr(f.original_name)}', '${f.mime_type||''}', ${f.file_size||0})"
+              class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-purple-600" title="Xem trước">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            </button>
+            <a href="/api/projects/${currentProject.id}/files/${f.id}/download"
+              class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600" title="Tải về">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            </a>
+            ${canEdit ? `
+            <button onclick="openRenameModal(${f.id}, '${escAttr(f.original_name)}')"
+              class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-yellow-600" title="Đổi tên">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="openDeleteFileModal(${f.id}, '${escAttr(f.original_name)}')"
+              class="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600" title="Xóa">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>`).join('');
+    lucide.createIcons();
+  }
+
+  async function handleUpload(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const progress = document.getElementById('uploadProgress');
+    const progressText = document.getElementById('uploadProgressText');
+    progress.classList.remove('hidden');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      progressText.textContent = `Đang upload ${i + 1}/${files.length}: ${file.name}`;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch(`/api/projects/${currentProject.id}/files/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok) showToast(data.message, 'error');
+      } catch { showToast('Lỗi upload ' + file.name, 'error'); }
+    }
+    progress.classList.add('hidden');
+    e.target.value = '';
+    showToast('Upload thành công');
+    loadFiles();
+  }
+
+  function openRenameModal(fileId, currentName) {
+    renameFileId = fileId;
+    document.getElementById('renameInput').value = currentName;
+    openModal('modalRename');
+    setTimeout(() => document.getElementById('renameInput').select(), 100);
+  }
+  async function confirmRename() {
+    const new_name = document.getElementById('renameInput').value.trim();
+    if (!new_name) return showToast('Tên không được trống', 'error');
+    const res = await api(`/api/projects/${currentProject.id}/files/${renameFileId}/rename`, {
+      method: 'PUT', body: JSON.stringify({ new_name })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalRename');
+    showToast('Đã đổi tên file');
+    loadFiles();
+  }
+
+  function openDeleteFileModal(fileId, fileName) {
+    deleteFileId = fileId;
+    document.getElementById('deleteFileName').textContent = fileName;
+    openModal('modalDeleteFile');
+  }
+  async function confirmDeleteFile() {
+    const res = await api(`/api/projects/${currentProject.id}/files/${deleteFileId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalDeleteFile');
+    showToast('Đã xóa file');
+    loadFiles();
+  }
+
+  // ══════════════════════════════════════════════
+  // MEMBERS
+  // ══════════════════════════════════════════════
+  async function loadMembers() {
+    document.getElementById('membersLoading').classList.remove('hidden');
+    document.getElementById('memberTable').classList.add('hidden');
+
+    const res = await api('/api/projects/' + currentProject.id + '/members');
+    const members = await res.json();
+    document.getElementById('membersLoading').classList.add('hidden');
+    document.getElementById('memberTable').classList.remove('hidden');
+
+    const isOwner = currentProject.my_role === 'owner';
+    document.getElementById('memberTableBody').innerHTML = members.map(m => {
+      const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[m.role];
+      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[m.role];
+      const actions = (isOwner && m.role !== 'owner') ? `
+        <button onclick="openChangeRoleModal(${m.id}, '${escAttr(m.username)}', '${m.role}')"
+          class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600" title="Đổi quyền">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+        </button>
+        <button onclick="removeMember(${m.id}, '${escAttr(m.username)}')"
+          class="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600" title="Xóa khỏi project">
+          <i data-lucide="user-x" class="w-3.5 h-3.5"></i>
+        </button>` : '';
+      return `
+      <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors fade-in">
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-semibold text-xs">
+              ${m.username.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-800">${escHtml(m.username)}</p>
+              <p class="text-xs text-gray-400">${escHtml(m.email)}</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-4 py-3">
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${roleClass}">${roleLabel}</span>
+        </td>
+        <td class="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">${formatDate(m.joined_at)}</td>
+        <td class="px-4 py-3"><div class="flex items-center justify-end gap-1">${actions}</div></td>
+      </tr>`;
+    }).join('');
+    lucide.createIcons();
+  }
+
+  async function addMember() {
+    const username = document.getElementById('newMemberUsername').value.trim();
+    const role = document.getElementById('newMemberRole').value;
+    if (!username) return showToast('Nhập tên đăng nhập', 'error');
+
+    const res = await api('/api/projects/' + currentProject.id + '/members', {
+      method: 'POST', body: JSON.stringify({ username, role })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    document.getElementById('newMemberUsername').value = '';
+    showToast(data.message);
+    loadMembers();
+  }
+
+  function openChangeRoleModal(memberId, username, currentRole) {
+    changeRoleMemberId = memberId;
+    document.getElementById('changeRoleUsername').textContent = username;
+    document.getElementById('changeRoleSelect').value = currentRole;
+    openModal('modalChangeRole');
+  }
+  async function confirmChangeRole() {
+    const role = document.getElementById('changeRoleSelect').value;
+    const res = await api(`/api/projects/${currentProject.id}/members/${changeRoleMemberId}`, {
+      method: 'PUT', body: JSON.stringify({ role })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalChangeRole');
+    showToast('Đã cập nhật quyền');
+    loadMembers();
+  }
+
+  async function removeMember(memberId, username) {
+    if (!confirm(`Xóa ${username} khỏi project?`)) return;
+    const res = await api(`/api/projects/${currentProject.id}/members/${memberId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    showToast(`Đã xóa ${username}`);
+    loadMembers();
+  }
+
+  // ══════════════════════════════════════════════
+  // PREVIEW FILE
+  // ══════════════════════════════════════════════
+  async function openPreview(fileId, name, mime, size) {
+    document.getElementById('previewName').textContent = name;
+    document.getElementById('previewSize').textContent = size > 0 ? formatSize(Number(size)) : '';
+    const dl = document.getElementById('previewDownload');
+    dl.href = `/api/projects/${currentProject.id}/files/${fileId}/download`;
+    dl.download = name;
+    const iconMap = { image:'image', video:'film', audio:'music', pdf:'file-text' };
+    const cat = getPreviewCat(mime);
+    document.getElementById('previewIcon').setAttribute('data-lucide', iconMap[cat] || getFileIcon(mime));
+    lucide.createIcons();
+    const body = document.getElementById('previewBody');
+    body.innerHTML = '<div class="text-gray-400 text-sm flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 spin"></i> Đang tải...</div>';
+    lucide.createIcons();
+    openModal('modalPreview');
+    const url = `/api/projects/${currentProject.id}/files/${fileId}/download`;
+    try {
+      if (cat === 'image') {
+        const blob = await fetchProjectBlob(url);
+        body.innerHTML = `<img src="${blob}" alt="${name}" class="max-w-full max-h-full object-contain rounded-lg shadow" style="max-height:calc(90vh - 80px)">`;
+      } else if (cat === 'video') {
+        const blob = await fetchProjectBlob(url);
+        body.innerHTML = `<video controls class="max-w-full rounded-lg shadow" style="max-height:calc(90vh - 80px)"><source src="${blob}" type="${mime}"></video>`;
+      } else if (cat === 'audio') {
+        const blob = await fetchProjectBlob(url);
+        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-8 w-full max-w-sm"><div class="w-20 h-20 rounded-2xl bg-pink-50 flex items-center justify-center"><i data-lucide="music" class="w-10 h-10 text-pink-400"></i></div><p class="text-sm text-gray-600 font-medium text-center">${name}</p><audio controls class="w-full"><source src="${blob}" type="${mime}"></audio></div>`;
+        lucide.createIcons();
+      } else if (cat === 'pdf') {
+        const blob = await fetchProjectBlob(url);
+        body.innerHTML = `<iframe src="${blob}" class="w-full rounded-lg border-0" style="height:calc(90vh - 80px)"></iframe>`;
+      } else {
+        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-10"><div class="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center"><i data-lucide="${getFileIcon(mime)}" class="w-10 h-10 text-gray-400"></i></div><div class="text-center"><p class="text-gray-700 font-semibold text-sm mb-1">${name}</p><p class="text-gray-400 text-xs">${size > 0 ? formatSize(Number(size)) : ''} ${mime ? '· '+mime : ''}</p></div><p class="text-gray-400 text-xs">Không thể xem trước loại file này</p><a href="${url}" download="${name}" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><i data-lucide=\"download\" class=\"w-4 h-4\"></i> Tải về để mở</a></div>`;
+        lucide.createIcons();
+      }
+    } catch(err) {
+      body.innerHTML = '<div class="text-red-400 text-sm">Không thể tải file để xem trước.</div>';
+    }
+  }
+
+  function closePreview() {
+    const body = document.getElementById('previewBody');
+    if (!body) return;
+    body.querySelectorAll('img, video source, audio source, iframe').forEach(el => {
+      const src = el.src || el.getAttribute('src') || '';
+      if (src.startsWith('blob:')) URL.revokeObjectURL(src);
+    });
+    body.innerHTML = '';
+    closeModal('modalPreview');
+  }
+
+  async function fetchProjectBlob(url) {
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) throw new Error('fetch failed');
+    return URL.createObjectURL(await res.blob());
+  }
+
+  function getPreviewCat(mime) {
+    if (!mime) return 'other';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime.includes('pdf')) return 'pdf';
+    return 'other';
+  }
+
+  // ══════════════════════════════════════════════
+  // AUTOCOMPLETE USERNAME
+  // ══════════════════════════════════════════════
+  let acResults = [];
+  let acIndex = -1;
+  let acTimer = null;
+
+  async function searchUsers(q) {
+    const dd = document.getElementById('userDropdown');
+    q = q.trim();
+    if (q.length < 1) { dd.classList.add('hidden'); acResults = []; return; }
+    clearTimeout(acTimer);
+    acTimer = setTimeout(async () => {
+      try {
+        const projectId = currentProject ? currentProject.id : '';
+        const res = await api(`/api/projects/search-users?q=${encodeURIComponent(q)}&project=${projectId}`);
+        if (!res.ok) return;
+        acResults = await res.json();
+        acIndex = -1;
+        renderDropdown();
+      } catch(e) { console.error('searchUsers error:', e); }
+    }, 250);
+  }
+
+  function renderDropdown() {
+    const dd = document.getElementById('userDropdown');
+    if (!acResults.length) {
+      // Hiện thông báo không tìm thấy
+      const inp = document.getElementById('newMemberUsername');
+      const rect = inp.getBoundingClientRect();
+      dd.style.top = (rect.bottom + 4) + 'px';
+      dd.style.left = rect.left + 'px';
+      dd.style.width = rect.width + 'px';
+      dd.innerHTML = '<div class="px-4 py-3 text-sm text-gray-400 text-center">Không tìm thấy người dùng</div>';
+      dd.classList.remove('hidden');
+      return;
+    }
+    // Tính toán vị trí dựa vào input
+    const inp = document.getElementById('newMemberUsername');
+    const rect = inp.getBoundingClientRect();
+    dd.style.top = (rect.bottom + 4) + 'px';
+    dd.style.left = rect.left + 'px';
+    dd.style.width = rect.width + 'px';
+    dd.classList.remove('hidden');
+    dd.innerHTML = acResults.map((u, i) => `
+      <div onclick="pickUser('${u.username.replace(/\'/g, "&apos;")}')"
+        id="ac-item-${i}"
+        class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors">
+        <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+          ${u.username.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-800">${u.username}</p>
+          <p class="text-xs text-gray-400">${u.email}</p>
+        </div>
+      </div>`).join('');
+  }
+
+  function pickUser(username) {
+    document.getElementById('newMemberUsername').value = username;
+    document.getElementById('userDropdown').classList.add('hidden');
+    acResults = [];
+    document.getElementById('newMemberRole').focus();
+  }
+
+  function handleUserKeydown(e) {
+    const dd = document.getElementById('userDropdown');
+    if (dd.classList.contains('hidden')) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acIndex = Math.min(acIndex + 1, acResults.length - 1);
+      highlightAc();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acIndex = Math.max(acIndex - 1, -1);
+      highlightAc();
+    } else if (e.key === 'Enter' && acIndex >= 0) {
+      e.preventDefault();
+      pickUser(acResults[acIndex].username);
+    } else if (e.key === 'Escape') {
+      dd.classList.add('hidden');
+    }
+  }
+
+  function highlightAc() {
+    acResults.forEach((_, i) => {
+      const el = document.getElementById('ac-item-' + i);
+      if (el) el.className = i === acIndex
+        ? 'flex items-center gap-2.5 px-3 py-2 cursor-pointer bg-blue-100 transition-colors'
+        : 'flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors';
+    });
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#newMemberUsername') && !e.target.closest('#userDropdown')) {
+      const dd = document.getElementById('userDropdown');
+      if (dd) dd.classList.add('hidden');
+    }
+  });
+
+  // Ẩn dropdown khi scroll
+  document.querySelector('main').addEventListener('scroll', () => {
+    const dd = document.getElementById('userDropdown');
+    if (dd) dd.classList.add('hidden');
+  });
+
+  // ══════════════════════════════════════════════
+  // HELPERS
+  // ══════════════════════════════════════════════
+  function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(s) { return String(s || '').replace(/'/g, "\\'"); }
+
+  function formatSize(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+    return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
+  }
+
+  function formatDate(d) {
+    if (!d) return '—';
+    const dt = new Date(d);
+    return dt.toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' });
+  }
+
+  function getFileIcon(mime) {
+    if (!mime) return 'file';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'film';
+    if (mime.startsWith('audio/')) return 'music';
+    if (mime.includes('pdf')) return 'file-text';
+    if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return 'archive';
+    if (mime.includes('word') || mime.includes('document')) return 'file-text';
+    if (mime.includes('sheet') || mime.includes('excel')) return 'table';
+    if (mime.includes('presentation') || mime.includes('powerpoint')) return 'presentation';
+    if (mime.includes('text/')) return 'file-code';
+    return 'file';
+  }
+
+  function getFileColor(mime) {
+    if (!mime) return 'text-gray-400';
+    if (mime.startsWith('image/')) return 'text-purple-500';
+    if (mime.startsWith('video/')) return 'text-pink-500';
+    if (mime.startsWith('audio/')) return 'text-yellow-500';
+    if (mime.includes('pdf')) return 'text-red-500';
+    if (mime.includes('zip') || mime.includes('rar')) return 'text-orange-500';
+    if (mime.includes('word') || mime.includes('document')) return 'text-blue-500';
+    if (mime.includes('sheet') || mime.includes('excel')) return 'text-green-500';
+    return 'text-gray-400';
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['modalCreate','modalEdit','modalDeleteProject','modalRename','modalDeleteFile','modalChangeRole']
+        .forEach(id => closeModal(id));
+      closePreview();
+    }
+  });
+
+  // ── INIT ──
+  loadProjects();
+  lucide.createIcons();
+</script>
+</body>
+</html>
