@@ -8,6 +8,7 @@ const auth       = require('../middleware/authMiddleware');
 const checkQuota = require('../middleware/quotaMiddleware');
 const db         = require('../config/db');
 
+// ─── Upload thường (≤ 100MB, qua Cloudflare) ─────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '../uploads', String(req.user.id));
@@ -16,7 +17,46 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
-const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
+
+// Giới hạn 100MB mỗi file để không vượt giới hạn Cloudflare Tunnel (100MB/request).
+// File lớn hơn phải dùng chunked upload.
+const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+
+// ─── Chunk upload storage ─────────────────────────────────────────────────────
+const chunkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const tmpDir = path.join(__dirname, '../uploads/_chunks', req.body.uploadId || 'unknown');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      cb(null, tmpDir);
+    },
+    filename: (req, file, cb) => {
+      // Tên chunk = số thứ tự để sort đúng thứ tự khi ghép
+      const idx = parseInt(req.body.chunkIndex) || 0;
+      cb(null, String(idx).padStart(6, '0') + '.part');
+    }
+  }),
+  // Mỗi chunk tối đa 10MB → luôn nhỏ hơn giới hạn 100MB của Cloudflare
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// ─── Helper: kiểm tra quota chính xác bằng kích thước thực ───────────────────
+async function checkQuotaExact(userId, fileSize) {
+  const [rows] = await db.query(
+    'SELECT quota, used_space FROM users WHERE id = ?',
+    [userId]
+  );
+  if (!rows.length) throw new Error('User không tồn tại');
+  const { quota, used_space } = rows[0];
+  if (used_space + fileSize > quota) {
+    const err = new Error('Dung lượng lưu trữ đã đầy. Vui lòng xóa bớt file.');
+    err.status = 413;
+    err.used   = used_space;
+    err.quota  = quota;
+    throw err;
+  }
+  return { quota, used_space };
+}
 
 // ── GET /api/files ── danh sách file trong folder
 router.get('/', auth, async (req, res) => {
@@ -112,18 +152,236 @@ router.get('/search-users', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi tìm kiếm' }); }
 });
 
-// ── POST /api/files/upload ──
+// ════════════════════════════════════════════════════════════════
+// UPLOAD THƯỜNG (file ≤ 100MB)
+// ════════════════════════════════════════════════════════════════
+
 router.post('/upload', auth, checkQuota, upload.single('file'), async (req, res) => {
   try {
+    if (!req.file) return res.status(400).json({ message: 'Không có file được gửi lên' });
+
     const folder = req.body.folder || '/';
     const { filename, originalname, size, mimetype } = req.file;
+
+    // FIX #1: Kiểm tra quota bằng kích thước file THỰC TẾ sau khi multer parse,
+    // không dùng Content-Length ước tính từ middleware.
+    try {
+      await checkQuotaExact(req.user.id, size);
+    } catch (quotaErr) {
+      // Xóa file vừa lưu vì không đủ quota
+      fs.unlink(req.file.path, () => {});
+      return res.status(quotaErr.status || 413).json({
+        message: quotaErr.message,
+        used: quotaErr.used,
+        quota: quotaErr.quota
+      });
+    }
+
     await db.query(
       'INSERT INTO files (user_id, filename, original_name, file_size, mime_type, folder_path) VALUES (?,?,?,?,?,?)',
       [req.user.id, filename, originalname, size, mimetype, folder]
     );
     await db.query('UPDATE users SET used_space = used_space + ? WHERE id = ?', [size, req.user.id]);
+
     res.json({ message: 'Upload thành công', filename, original_name: originalname });
-  } catch (err) { res.status(500).json({ message: 'Lỗi upload' }); }
+  } catch (err) {
+    console.error('upload error:', err);
+    // Dọn file nếu còn trên disk
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ message: 'Lỗi upload' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+// CHUNKED UPLOAD — dành cho file lớn (> 100MB)
+// Luồng: chunk-init → chunk (× N) → chunk-finalize
+// ════════════════════════════════════════════════════════════════
+
+// ── 1. POST /api/files/upload/chunk-init ──
+router.post('/upload/chunk-init', auth, async (req, res) => {
+  try {
+    const { originalName, totalSize, mimeType, folder, totalChunks } = req.body;
+
+    if (!originalName || !totalSize || !totalChunks) {
+      return res.status(400).json({ message: 'Thiếu thông tin file (originalName, totalSize, totalChunks)' });
+    }
+
+    const parsedSize   = parseInt(totalSize);
+    const parsedChunks = parseInt(totalChunks);
+
+    if (isNaN(parsedSize) || parsedSize <= 0)   return res.status(400).json({ message: 'totalSize không hợp lệ' });
+    if (isNaN(parsedChunks) || parsedChunks <= 0) return res.status(400).json({ message: 'totalChunks không hợp lệ' });
+
+    // FIX #3: Vẫn kiểm tra quota sơ bộ ở đây, nhưng sẽ kiểm tra lại bằng
+    // kích thước THỰC TẾ ở finalize — không tin hoàn toàn vào totalSize từ client.
+    const [rows] = await db.query('SELECT quota, used_space FROM users WHERE id = ?', [req.user.id]);
+    if (!rows.length) return res.status(404).json({ message: 'User không tồn tại' });
+    const { quota, used_space } = rows[0];
+    if (used_space + parsedSize > quota) {
+      return res.status(413).json({
+        message: 'Dung lượng lưu trữ đã đầy. Vui lòng xóa bớt file.',
+        used: used_space,
+        quota
+      });
+    }
+
+    const uploadId = uuidv4();
+    const tmpDir   = path.join(__dirname, '../uploads/_chunks', uploadId);
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    // Lưu metadata — ghi thêm createdAt để cleanup job biết session cũ
+    const meta = {
+      originalName,
+      totalSize: parsedSize,
+      mimeType: mimeType || 'application/octet-stream',
+      folder: folder || '/',
+      totalChunks: parsedChunks,
+      userId: req.user.id,
+      createdAt: Date.now()
+    };
+    fs.writeFileSync(path.join(tmpDir, '_meta.json'), JSON.stringify(meta));
+
+    res.json({ uploadId, message: 'Đã khởi tạo upload' });
+  } catch (err) {
+    console.error('chunk-init error:', err);
+    res.status(500).json({ message: 'Lỗi khởi tạo upload' });
+  }
+});
+
+// ── 2. POST /api/files/upload/chunk ──
+router.post('/upload/chunk', auth, chunkUpload.single('chunk'), async (req, res) => {
+  try {
+    const { uploadId, chunkIndex, totalChunks } = req.body;
+    if (!uploadId || chunkIndex === undefined) {
+      return res.status(400).json({ message: 'Thiếu uploadId hoặc chunkIndex' });
+    }
+
+    const tmpDir = path.join(__dirname, '../uploads/_chunks', uploadId);
+    if (!fs.existsSync(tmpDir)) {
+      return res.status(404).json({ message: 'Upload session không tồn tại. Hãy bắt đầu lại.' });
+    }
+
+    const metaPath = path.join(tmpDir, '_meta.json');
+    const meta     = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    if (meta.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Không có quyền' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Không nhận được dữ liệu chunk' });
+    }
+
+    res.json({
+      message: `Chunk ${chunkIndex} nhận xong`,
+      chunkIndex: parseInt(chunkIndex),
+      received: req.file.size
+    });
+  } catch (err) {
+    console.error('chunk upload error:', err);
+    res.status(500).json({ message: 'Lỗi nhận chunk' });
+  }
+});
+
+// ── 3. POST /api/files/upload/chunk-finalize ──
+router.post('/upload/chunk-finalize', auth, async (req, res) => {
+  let finalPath = null;
+  const tmpDir  = req.body.uploadId
+    ? path.join(__dirname, '../uploads/_chunks', req.body.uploadId)
+    : null;
+
+  try {
+    const { uploadId } = req.body;
+    if (!uploadId) return res.status(400).json({ message: 'Thiếu uploadId' });
+
+    if (!fs.existsSync(tmpDir)) {
+      return res.status(404).json({ message: 'Upload session không tồn tại' });
+    }
+
+    const metaPath = path.join(tmpDir, '_meta.json');
+    const meta     = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    if (meta.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Không có quyền' });
+    }
+
+    // Kiểm tra đủ chunk chưa
+    const chunkFiles = fs.readdirSync(tmpDir)
+      .filter(f => f.endsWith('.part'))
+      .sort();
+
+    if (chunkFiles.length !== meta.totalChunks) {
+      return res.status(400).json({
+        message: `Thiếu chunk: nhận ${chunkFiles.length}/${meta.totalChunks}`
+      });
+    }
+
+    // Tạo file đích
+    const ext      = path.extname(meta.originalName);
+    const finalFn  = uuidv4() + ext;
+    const userDir  = path.join(__dirname, '../uploads', String(req.user.id));
+    fs.mkdirSync(userDir, { recursive: true });
+    finalPath = path.join(userDir, finalFn);
+
+    // FIX #2: Ghép chunk bằng stream pipe tuần tự, KHÔNG readFileSync vào RAM.
+    // Với file GB, cách cũ sẽ OOM crash server.
+    await new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(finalPath);
+      writeStream.on('error', reject);
+      writeStream.on('finish', resolve);
+
+      // Pipe từng chunk vào writeStream theo thứ tự, không giữ toàn bộ data trong RAM
+      const pipeNext = (i) => {
+        if (i >= chunkFiles.length) {
+          writeStream.end();
+          return;
+        }
+        const chunkPath  = path.join(tmpDir, chunkFiles[i]);
+        const readStream = fs.createReadStream(chunkPath);
+        readStream.on('error', reject);
+        readStream.on('end', () => pipeNext(i + 1));
+        readStream.pipe(writeStream, { end: false });
+      };
+
+      pipeNext(0);
+    });
+
+    // Kích thước file THỰC TẾ sau khi ghép
+    const actualSize = fs.statSync(finalPath).size;
+
+    // FIX #3 + #4: Kiểm tra quota bằng kích thước THỰC TẾ, không tin totalSize từ client.
+    try {
+      await checkQuotaExact(req.user.id, actualSize);
+    } catch (quotaErr) {
+      fs.unlink(finalPath, () => {});
+      finalPath = null;
+      return res.status(quotaErr.status || 413).json({
+        message: quotaErr.message,
+        used: quotaErr.used,
+        quota: quotaErr.quota
+      });
+    }
+
+    // Lưu vào DB và cập nhật used_space
+    await db.query(
+      'INSERT INTO files (user_id, filename, original_name, file_size, mime_type, folder_path) VALUES (?,?,?,?,?,?)',
+      [req.user.id, finalFn, meta.originalName, actualSize, meta.mimeType, meta.folder]
+    );
+    await db.query('UPDATE users SET used_space = used_space + ? WHERE id = ?', [actualSize, req.user.id]);
+
+    // Dọn thư mục chunk tạm
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    res.json({
+      message: 'Upload hoàn tất',
+      filename: finalFn,
+      original_name: meta.originalName,
+      file_size: actualSize
+    });
+  } catch (err) {
+    console.error('chunk-finalize error:', err);
+    // Dọn file đích nếu ghép lỗi giữa chừng
+    if (finalPath && fs.existsSync(finalPath)) fs.unlink(finalPath, () => {});
+    res.status(500).json({ message: 'Lỗi ghép file: ' + err.message });
+  }
 });
 
 // ── POST /api/files/tags ── tạo tag
@@ -175,7 +433,7 @@ router.put('/:id/favorite', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi yêu thích' }); }
 });
 
-// ── PUT /api/files/:id/restore ── khôi phục từ trash
+// ── PUT /api/files/:id/restore ──
 router.put('/:id/restore', auth, async (req, res) => {
   try {
     await db.query('UPDATE files SET is_deleted=0, deleted_at=NULL WHERE id=? AND user_id=?', [req.params.id, req.user.id]);
@@ -183,7 +441,7 @@ router.put('/:id/restore', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi khôi phục' }); }
 });
 
-// ── PUT /api/files/:id/tags ── cập nhật tags cho file
+// ── PUT /api/files/:id/tags ──
 router.put('/:id/tags', auth, async (req, res) => {
   try {
     const { tag_ids } = req.body;
@@ -223,13 +481,13 @@ router.delete('/trash/empty', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi dọn thùng rác' }); }
 });
 
-// ── DELETE /api/files/:id/permanent ── xóa vĩnh viễn
+// ── DELETE /api/files/:id/permanent ──
 router.delete('/:id/permanent', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM files WHERE id=? AND user_id=? AND is_deleted=1', [req.params.id, req.user.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy file trong thùng rác' });
     const file = rows[0];
-    const fp = path.join(__dirname, '../uploads', String(req.user.id), file.filename);
+    const fp   = path.join(__dirname, '../uploads', String(req.user.id), file.filename);
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
     await db.query('DELETE FROM files WHERE id=?', [req.params.id]);
     await db.query('UPDATE users SET used_space=used_space-? WHERE id=?', [file.file_size, req.user.id]);
@@ -237,7 +495,7 @@ router.delete('/:id/permanent', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi xóa vĩnh viễn' }); }
 });
 
-// ── DELETE /api/files/tags/:tagId ── xóa tag
+// ── DELETE /api/files/tags/:tagId ──
 router.delete('/tags/:tagId', auth, async (req, res) => {
   try {
     await db.query('DELETE FROM tags WHERE id=? AND user_id=?', [req.params.tagId, req.user.id]);
@@ -258,7 +516,7 @@ router.get('/:id/shared-users', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 });
 
-// ── POST /api/files/:id/share-user ── chia sẻ cho user
+// ── POST /api/files/:id/share-user ──
 router.post('/:id/share-user', auth, async (req, res) => {
   try {
     const { username, can_download } = req.body;
@@ -278,7 +536,7 @@ router.post('/:id/share-user', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi chia sẻ' }); }
 });
 
-// ── DELETE /api/files/:id/share-user/:userId ── thu hồi
+// ── DELETE /api/files/:id/share-user/:userId ──
 router.delete('/:id/share-user/:userId', auth, async (req, res) => {
   try {
     await db.query('DELETE FROM shared_with_users WHERE file_id=? AND owner_id=? AND recipient_id=?',
