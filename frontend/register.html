@@ -33,11 +33,17 @@
 
             <!-- Success -->
             <div id="successBox" class="hidden text-center py-6">
-                <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="check-circle-2" class="w-9 h-9 text-green-500"></i>
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="mail-check" class="w-9 h-9 text-blue-600"></i>
                 </div>
-                <h3 class="text-gray-800 mb-2 text-lg font-semibold">Đăng ký thành công!</h3>
-                <p class="text-gray-500 text-sm">Tài khoản đã được tạo. Đang chuyển đến trang đăng nhập...</p>
+                <h3 class="text-gray-800 mb-2 text-lg font-semibold">Kiểm tra email của bạn!</h3>
+                <p class="text-gray-500 text-sm mb-1">Đăng ký thành công. Chúng tôi đã gửi link xác nhận đến:</p>
+                <p id="registeredEmail" class="font-semibold text-blue-600 text-sm mb-4"></p>
+                <p class="text-gray-400 text-xs mb-5">Nhấn vào link trong email để kích hoạt tài khoản. Kiểm tra cả mục Spam nếu không thấy.</p>
+                <a href="login.html" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    Về trang đăng nhập
+                </a>
             </div>
 
             <!-- Form -->
@@ -205,11 +211,11 @@
                     return;
                 }
 
-                // Thành công
+                // Thành công → hiện thông báo check email
+                document.getElementById('registeredEmail').textContent = em;
                 document.getElementById('formBox').classList.add('hidden');
                 document.getElementById('successBox').classList.remove('hidden');
                 lucide.createIcons();
-                setTimeout(() => window.location.href = 'login.html', 2000);
 
             } catch (err) {
                 showError('Không thể kết nối tới server.');

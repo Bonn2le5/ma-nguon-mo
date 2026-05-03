@@ -6,18 +6,46 @@
   <title>Projects - CloudStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; overflow: hidden; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .fade-in { animation: fadeIn 0.2s ease forwards; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin { animation: spin 0.8s linear infinite; }
-    .role-badge-owner  { background:#fef3c7; color:#92400e; }
-    .role-badge-editor { background:#dbeafe; color:#1e40af; }
-    .role-badge-viewer { background:#f3f4f6; color:#374151; }
-  </style>
+<style id="patch-styles">
+  /* Tag pill */
+  .tag-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    font-weight: 600; line-height: 1.6; white-space: nowrap;
+  }
+  .tag-pill .tag-x {
+    cursor: pointer; opacity: .6; font-size: 10px;
+    margin-left: 2px; line-height: 1;
+  }
+  .tag-pill .tag-x:hover { opacity: 1; }
+ 
+  /* Favorite star */
+  .star-btn { background: none; border: none; cursor: pointer; padding: 3px; }
+  .star-btn .star-icon { transition: color .15s, transform .15s; }
+  .star-btn:hover .star-icon { transform: scale(1.2); }
+  .star-btn.active .star-icon { color: #f59e0b; }
+  .star-btn:not(.active) .star-icon { color: #d1d5db; }
+ 
+  /* Upload progress bar */
+  #chunkProgressBar {
+    height: 6px; border-radius: 3px; background: #dbeafe;
+    overflow: hidden; margin-top: 6px;
+  }
+  #chunkProgressFill {
+    height: 100%; background: #2563eb;
+    transition: width .2s ease; width: 0%;
+  }
+ 
+  /* Tag modal color swatches */
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%;
+    cursor: pointer; border: 2px solid transparent;
+    transition: border-color .15s, transform .1s;
+  }
+  .swatch.selected, .swatch:hover { border-color: #111; transform: scale(1.15); }
+</style>
 </head>
+
 <body class="bg-gray-50">
 <div class="flex h-screen">
 
@@ -604,33 +632,273 @@
     lucide.createIcons();
   }
 
+ <script id="patch-handleUpload">
+  const CHUNK_SIZE   = 8 * 1024 * 1024;  // 8MB mỗi chunk
+  const NORMAL_LIMIT = 100 * 1024 * 1024; // dưới 100MB dùng upload thường
+ 
   async function handleUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const progress = document.getElementById('uploadProgress');
+ 
+    const progress     = document.getElementById('uploadProgress');
     const progressText = document.getElementById('uploadProgressText');
     progress.classList.remove('hidden');
-
+ 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      progressText.textContent = `Đang upload ${i + 1}/${files.length}: ${file.name}`;
-      const fd = new FormData();
-      fd.append('file', file);
+      progressText.textContent = `(${i + 1}/${files.length}) ${file.name}`;
+ 
       try {
-        const res = await fetch(`/api/projects/${currentProject.id}/files/upload`, {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + token },
-          body: fd
-        });
-        const data = await res.json();
-        if (!res.ok) showToast(data.message, 'error');
-      } catch { showToast('Lỗi upload ' + file.name, 'error'); }
+        if (file.size <= NORMAL_LIMIT) {
+          await uploadNormal(file);
+        } else {
+          await uploadChunked(file, progressText);
+        }
+      } catch (err) {
+        showToast('Lỗi upload: ' + file.name, 'error');
+      }
     }
+ 
+    // Ẩn thanh progress bar chunk nếu còn
+    const bar = document.getElementById('chunkProgressBar');
+    if (bar) bar.style.display = 'none';
+ 
     progress.classList.add('hidden');
     e.target.value = '';
     showToast('Upload thành công');
     loadFiles();
   }
+ 
+  // ── Upload thường (≤ 100MB) ────────────────────────────────────────────
+  async function uploadNormal(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res  = await fetch(`/api/projects/${currentProject.id}/files/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
+  }
+ 
+  // ── Chunked upload (> 100MB) ───────────────────────────────────────────
+  async function uploadChunked(file, progressText) {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const base        = `/api/projects/${currentProject.id}/files/upload`;
+ 
+    // Hiện progress bar
+    let bar = document.getElementById('chunkProgressBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'chunkProgressBar';
+      bar.innerHTML = '<div id="chunkProgressFill"></div>';
+      document.getElementById('uploadProgress').appendChild(bar);
+    }
+    bar.style.display = 'block';
+    const fill = document.getElementById('chunkProgressFill');
+ 
+    // 1. Init session
+    const initRes = await fetch(`${base}/chunk-init`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originalName: file.name,
+        totalSize:    file.size,
+        mimeType:     file.type || 'application/octet-stream',
+        totalChunks
+      })
+    });
+    const { uploadId } = await initRes.json();
+    if (!initRes.ok) throw new Error('Không thể khởi tạo upload');
+ 
+    // 2. Gửi từng chunk
+    for (let idx = 0; idx < totalChunks; idx++) {
+      const start = idx * CHUNK_SIZE;
+      const blob  = file.slice(start, start + CHUNK_SIZE);
+ 
+      const fd = new FormData();
+      fd.append('uploadId',    uploadId);
+      fd.append('chunkIndex',  idx);
+      fd.append('totalChunks', totalChunks);
+      fd.append('chunk',       blob, file.name);
+ 
+      const chunkRes = await fetch(`${base}/chunk`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd
+      });
+      if (!chunkRes.ok) throw new Error(`Lỗi chunk ${idx}`);
+ 
+      const pct = Math.round(((idx + 1) / totalChunks) * 100);
+      fill.style.width = pct + '%';
+      progressText.textContent = `${file.name} — ${pct}% (${idx + 1}/${totalChunks} chunks)`;
+    }
+ 
+    // 3. Finalize
+    const finalRes = await fetch(`${base}/chunk-finalize`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadId })
+    });
+    if (!finalRes.ok) {
+      const d = await finalRes.json();
+      throw new Error(d.message || 'Lỗi ghép file');
+    }
+    fill.style.width = '100%';
+  }
+script id="patch-new-functions">
+  // ── STATE ──────────────────────────────────────────────────────────────
+  let projectTags       = [];   // cache tags của project hiện tại
+  let assignTagFileId   = null; // file đang được gán tag
+  let assignTagSelected = new Set(); // tag ids đang chọn
+  let selectedTagColor  = '#6366f1'; // màu đang chọn khi tạo tag
+ 
+  const TAG_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#64748b'];
+ 
+  // ── FAVORITE ──────────────────────────────────────────────────────────
+  async function toggleFavorite(fileId, btn) {
+    const res  = await api(`/api/projects/${currentProject.id}/files/${fileId}/favorite`, { method: 'PUT' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+ 
+    const isFav = !!data.is_favorite;
+    btn.classList.toggle('active', isFav);
+    const svg = btn.querySelector('.star-icon');
+    svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
+    btn.title = isFav ? 'Bỏ yêu thích' : 'Yêu thích';
+    showToast(isFav ? '⭐ Đã thêm vào yêu thích' : 'Đã bỏ yêu thích');
+  }
+ 
+  // ── LOAD TAGS ─────────────────────────────────────────────────────────
+  async function loadProjectTags() {
+    const res  = await api(`/api/projects/${currentProject.id}/tags`);
+    projectTags = await res.json();
+    return projectTags;
+  }
+ 
+  // ── MỞ MODAL QUẢN LÝ TAGS ─────────────────────────────────────────────
+  async function openTagManagerModal() {
+    await loadProjectTags();
+    renderTagManagerList();
+    renderTagColorSwatches();
+    openModal('modalProjectTags');
+  }
+ 
+  function renderTagColorSwatches() {
+    document.getElementById('tagColorSwatches').innerHTML = TAG_COLORS.map(c =>
+      `<span class="swatch ${c === selectedTagColor ? 'selected' : ''}"
+        style="background:${c}" onclick="selectTagColor('${c}', this)" title="${c}"></span>`
+    ).join('');
+  }
+ 
+  function selectTagColor(color, el) {
+    selectedTagColor = color;
+    document.querySelectorAll('#tagColorSwatches .swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+ 
+  function renderTagManagerList() {
+    const canEdit = currentProject.my_role !== 'viewer';
+    document.getElementById('tagList').innerHTML = projectTags.length
+      ? projectTags.map(t => `
+          <div class="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
+            <span class="tag-pill" style="background:${t.color}22;color:${t.color}">${escHtml(t.name)}</span>
+            ${canEdit ? `<button onclick="deleteProjectTag(${t.id})" class="text-gray-300 hover:text-red-500 text-xs" title="Xóa">✕</button>` : ''}
+          </div>`).join('')
+      : '<p class="text-sm text-gray-400 text-center py-2">Chưa có tag nào</p>';
+  }
+ 
+  async function createProjectTag() {
+    const name = document.getElementById('newTagName').value.trim();
+    if (!name) return showToast('Nhập tên tag', 'error');
+ 
+    const res  = await api(`/api/projects/${currentProject.id}/tags`, {
+      method: 'POST',
+      body: JSON.stringify({ name, color: selectedTagColor })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+ 
+    document.getElementById('newTagName').value = '';
+    projectTags.push(data);
+    renderTagManagerList();
+    showToast('Đã tạo tag ' + name);
+  }
+ 
+  async function deleteProjectTag(tagId) {
+    const res = await api(`/api/projects/${currentProject.id}/tags/${tagId}`, { method: 'DELETE' });
+    if (!res.ok) return showToast('Lỗi xóa tag', 'error');
+    projectTags = projectTags.filter(t => t.id !== tagId);
+    renderTagManagerList();
+    showToast('Đã xóa tag');
+  }
+ 
+  // ── MỞ MODAL GÁN TAG CHO FILE ─────────────────────────────────────────
+  async function openAssignTagModal(fileId, fileName, currentTagIds) {
+    assignTagFileId = fileId;
+    assignTagSelected = new Set(
+      currentTagIds ? currentTagIds.split(',').map(Number).filter(Boolean) : []
+    );
+    document.getElementById('assignTagFileName').textContent = fileName;
+ 
+    await loadProjectTags();
+    renderAssignTagList();
+    openModal('modalAssignTag');
+  }
+ 
+  function renderAssignTagList() {
+    document.getElementById('assignTagList').innerHTML = projectTags.length
+      ? projectTags.map(t => `
+          <label class="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" value="${t.id}" ${assignTagSelected.has(t.id) ? 'checked' : ''}
+              onchange="toggleAssignTag(${t.id}, this.checked)"
+              class="w-4 h-4 rounded accent-blue-600">
+            <span class="tag-pill" style="background:${t.color}22;color:${t.color}">${escHtml(t.name)}</span>
+          </label>`).join('')
+      : `<p class="text-sm text-gray-400 text-center py-4">Chưa có tag nào.<br>
+          <button onclick="closeModal('modalAssignTag');openTagManagerModal()" class="text-blue-600 underline text-xs mt-1">Tạo tag mới</button></p>`;
+  }
+ 
+  function toggleAssignTag(tagId, checked) {
+    if (checked) assignTagSelected.add(tagId);
+    else         assignTagSelected.delete(tagId);
+  }
+ 
+  async function confirmAssignTags() {
+    const res = await api(`/api/projects/${currentProject.id}/files/${assignTagFileId}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify({ tag_ids: [...assignTagSelected] })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    closeModal('modalAssignTag');
+    showToast('Đã cập nhật tag');
+    loadFiles();
+  }
+ 
+  // ── NÚT MỞ MODAL TAG MANAGER — thêm vào toolbar hiện có ──────────────
+  // Gọi hàm này sau khi loadProject() để inject nút vào toolbar nếu chưa có
+  function injectTagManagerButton() {
+    if (document.getElementById('btnOpenTagManager')) return; // tránh inject 2 lần
+    const uploadBar = document.getElementById('uploadBar');
+    if (!uploadBar || currentProject.my_role === 'viewer') return;
+ 
+    const btn = document.createElement('button');
+    btn.id = 'btnOpenTagManager';
+    btn.onclick = openTagManagerModal;
+    btn.title = 'Quản lý Tags';
+    btn.className = 'inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors';
+    btn.innerHTML = `<i data-lucide="tags" class="w-4 h-4"></i><span class="hidden sm:inline">Tags</span>`;
+    uploadBar.appendChild(btn);
+    lucide.createIcons();
+  }
+ 
+  // Hook vào sau khi project được load — tìm chỗ gọi loadProject() và thêm:
+  //   injectTagManagerButton();
+  // Hoặc nếu dùng DOMContentLoaded / selectProject(), thêm dòng đó vào cuối hàm đó.
+</script>
+
 
   function openRenameModal(fileId, currentName) {
     renameFileId = fileId;

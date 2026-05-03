@@ -62,6 +62,10 @@
                     </div>
                 </div>
 
+                <div class="flex justify-end">
+                    <a href="forgot-password.html" class="text-xs text-blue-600 hover:text-blue-700">Quên mật khẩu?</a>
+                </div>
+
                 <button type="submit" id="submitBtn"
                     class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm transition flex items-center justify-center gap-2 font-semibold mt-2">
                     <i data-lucide="log-in" class="w-4 h-4"></i>
@@ -139,7 +143,27 @@
                 const data = await res.json();
 
                 if (!res.ok) {
-                    showError(data.message || 'Sai tên đăng nhập hoặc mật khẩu.');
+                    if (data.unverified) {
+                        errText.innerHTML = `${data.message} <a href="#" id="resendVerify" class="underline font-medium">Gửi lại email xác nhận</a>`;
+                        errAlert.classList.remove('hidden');
+                        // Gắn sự kiện sau khi render
+                        setTimeout(() => {
+                            document.getElementById('resendVerify')?.addEventListener('click', async (ev) => {
+                                ev.preventDefault();
+                                const email = prompt('Nhập email đã đăng ký:');
+                                if (!email) return;
+                                const r = await fetch('/api/auth/resend-verify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ email })
+                                });
+                                const d = await r.json();
+                                alert(d.message);
+                            });
+                        }, 50);
+                    } else {
+                        showError(data.message || 'Sai tên đăng nhập hoặc mật khẩu.');
+                    }
                     setLoading(false);
                     return;
                 }

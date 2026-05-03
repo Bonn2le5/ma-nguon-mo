@@ -248,9 +248,14 @@
             </div>
 
             <!-- Upload Progress bar -->
-            <div id="uploadProgress" style="display:none;background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:8px 24px;align-items:center;gap:10px;font-size:13px;color:#2563eb;flex-shrink:0;">
-                <div style="width:14px;height:14px;border:2px solid #3b82f6;border-top-color:transparent;border-radius:50%;" class="animate-spin"></div>
-                <span id="uploadProgressText">Đang upload...</span>
+            <div id="uploadProgress" style="display:none;background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:8px 24px;flex-direction:column;gap:6px;font-size:13px;color:#2563eb;flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:14px;height:14px;border:2px solid #3b82f6;border-top-color:transparent;border-radius:50%;flex-shrink:0;" class="animate-spin"></div>
+                    <span id="uploadProgressText">Đang upload...</span>
+                </div>
+                <div style="height:4px;background:#bfdbfe;border-radius:4px;overflow:hidden;">
+                    <div id="uploadProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px;transition:width 0.2s;"></div>
+                </div>
             </div>
 
             <!-- Content area -->
@@ -571,6 +576,82 @@
 
     <!-- Toast notification -->
     <div id="toastEl" class="hidden fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2"></div>
+
+    <!-- Context Menu -->
+    <div id="ctxMenu" style="display:none;position:fixed;z-index:9999;background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.14);padding:6px;min-width:200px;user-select:none;">
+        <div id="ctxHeader" style="padding:8px 12px 6px;border-bottom:1px solid #f1f5f9;margin-bottom:4px;">
+            <p id="ctxTitle" style="font-size:12px;font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;"></p>
+        </div>
+        <button class="ctx-item" onclick="ctxDownload()" id="ctxBtnDownload" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#374151;text-align:left;">
+            <i data-lucide="download" style="width:15px;height:15px;color:#3b82f6;flex-shrink:0;"></i> Tải xuống
+        </button>
+        <button class="ctx-item" onclick="ctxShare()" id="ctxBtnShare" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#374151;text-align:left;">
+            <i data-lucide="share-2" style="width:15px;height:15px;color:#7c3aed;flex-shrink:0;"></i> Chia sẻ
+        </button>
+        <button class="ctx-item" onclick="ctxMoveToProject()" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#374151;text-align:left;">
+            <i data-lucide="layout-grid" style="width:15px;height:15px;color:#059669;flex-shrink:0;"></i> Chuyển vào Project
+        </button>
+        <div style="height:1px;background:#f1f5f9;margin:4px 0;"></div>
+        <button class="ctx-item" onclick="ctxDelete()" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#ef4444;text-align:left;">
+            <i data-lucide="trash-2" style="width:15px;height:15px;flex-shrink:0;"></i> <span id="ctxDeleteLabel">Xóa</span>
+        </button>
+        <!-- Bulk actions (hiện khi chọn nhiều) -->
+        <div id="ctxBulkSection" style="display:none;">
+            <div style="height:1px;background:#f1f5f9;margin:4px 0;"></div>
+            <button class="ctx-item" onclick="ctxBulkDelete()" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#ef4444;text-align:left;">
+                <i data-lucide="trash-2" style="width:15px;height:15px;flex-shrink:0;"></i> Xóa tất cả đã chọn (<span id="ctxBulkCount">0</span>)
+            </button>
+            <button class="ctx-item" onclick="ctxBulkMoveToProject()" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:none;cursor:pointer;border-radius:9px;font-size:13px;color:#374151;text-align:left;">
+                <i data-lucide="layout-grid" style="width:15px;height:15px;color:#059669;flex-shrink:0;"></i> Chuyển tất cả vào Project (<span id="ctxBulkCount2">0</span>)
+            </button>
+        </div>
+    </div>
+
+    <!-- Move to Project Modal -->
+    <div id="moveProjectModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMoveProjectModal()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center">
+                        <i data-lucide="layout-grid" class="w-5 h-5 text-green-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-900 font-semibold text-sm">Chuyển vào Project</p>
+                        <p class="text-xs text-gray-400" id="moveProjectSubtitle">Chọn project đích</p>
+                    </div>
+                </div>
+                <button onclick="closeMoveProjectModal()" class="p-1.5 hover:bg-gray-100 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4 text-gray-400"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <div id="projectListForMove" class="space-y-2 max-h-64 overflow-y-auto">
+                    <p class="text-xs text-gray-400 text-center py-4">Đang tải...</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 px-5 pb-4">
+                <button onclick="closeMoveProjectModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection toolbar (floating) -->
+    <div id="selectionToolbar" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;background:#1e293b;color:#fff;padding:10px 20px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);display:none;align-items:center;gap:16px;font-size:13px;white-space:nowrap;">
+        <span><b id="selCount">0</b> file đã chọn</span>
+        <div style="width:1px;height:20px;background:#475569;"></div>
+        <button onclick="selectAllFiles()" style="background:none;border:none;color:#93c5fd;cursor:pointer;font-size:13px;padding:0;">Chọn tất cả</button>
+        <button onclick="clearSelection()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:0;">Bỏ chọn</button>
+        <div style="width:1px;height:20px;background:#475569;"></div>
+        <button onclick="bulkDeleteSelected()" style="display:flex;align-items:center;gap:6px;background:#ef444422;border:none;color:#fca5a5;cursor:pointer;font-size:13px;padding:6px 12px;border-radius:9px;">
+            <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Xóa
+        </button>
+        <button onclick="bulkMoveToProject()" style="display:flex;align-items:center;gap:6px;background:#10b98122;border:none;color:#6ee7b7;cursor:pointer;font-size:13px;padding:6px 12px;border-radius:9px;">
+            <i data-lucide="layout-grid" style="width:14px;height:14px;"></i> Vào Project
+        </button>
+    </div>
+
+    <!-- Drag selection overlay -->
+    <div id="dragSelectBox" style="display:none;position:fixed;border:2px solid #3b82f6;background:rgba(59,130,246,0.08);border-radius:4px;pointer-events:none;z-index:9990;"></div>
 
     <!-- Create Folder Modal -->
     <div id="createFolderModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1161,43 +1242,149 @@
         });
 
         // ===== UPLOAD FILE =====
+        // ══════════════════════════════════════════════
+        // CHUNKED UPLOAD
+        // Mỗi chunk = 5MB, gửi tuần tự
+        // Mỗi request < 5MB → Cloudflare không timeout
+        // ══════════════════════════════════════════════
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB mỗi chunk
+
+        async function uploadFileChunked(file, folder, onProgress) {
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+            // ── Bước 1: Init session ──
+            const initRes = await fetch('/api/files/upload/chunk-init', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    originalName: file.name,
+                    totalSize: file.size,
+                    mimeType: file.type || 'application/octet-stream',
+                    folder: folder,
+                    totalChunks: totalChunks
+                })
+            });
+            const initData = await initRes.json();
+            if (!initRes.ok) return { ok: false, msg: initData.message || 'Lỗi khởi tạo upload' };
+
+            const uploadId = initData.uploadId;
+
+            // ── Bước 2: Gửi từng chunk ──
+            let bytesSent = 0;
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end   = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('uploadId', uploadId);
+                formData.append('chunkIndex', i);
+                formData.append('totalChunks', totalChunks);
+                formData.append('chunk', chunk, file.name);
+
+                // XHR để hiện progress từng chunk
+                const chunkResult = await new Promise((resolve) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/files/upload/chunk');
+                    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const totalSent = bytesSent + e.loaded;
+                            const pct = Math.min(Math.round((totalSent / file.size) * 95), 95); // max 95% cho đến finalize
+                            onProgress(pct, totalSent, file.size, i + 1, totalChunks);
+                        }
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true });
+                            else resolve({ ok: false, msg: data.message || `Lỗi chunk ${i}` });
+                        } catch {
+                            resolve({ ok: false, msg: `Lỗi parse chunk ${i}` });
+                        }
+                    });
+                    xhr.addEventListener('error',   () => resolve({ ok: false, msg: 'Mất kết nối khi gửi chunk ' + i }));
+                    xhr.addEventListener('timeout', () => resolve({ ok: false, msg: `Timeout chunk ${i}` }));
+                    xhr.timeout = 3 * 60 * 1000; // 3 phút/chunk
+                    xhr.send(formData);
+                });
+
+                if (!chunkResult.ok) return { ok: false, msg: chunkResult.msg };
+                bytesSent = end;
+            }
+
+            // ── Bước 3: Finalize (ghép file) ──
+            onProgress(97, file.size, file.size, totalChunks, totalChunks);
+            const finalRes = await fetch('/api/files/upload/chunk-finalize', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ uploadId })
+            });
+            const finalData = await finalRes.json();
+            if (!finalRes.ok) return { ok: false, msg: finalData.message || 'Lỗi ghép file' };
+
+            onProgress(100, file.size, file.size, totalChunks, totalChunks);
+            return { ok: true, filename: finalData.filename };
+        }
+
         document.getElementById('fileInput').addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (!files.length) return;
 
-            const progress = document.getElementById('uploadProgress');
-            const progressText = document.getElementById('uploadProgressText');
+            const progress    = document.getElementById('uploadProgress');
+            const progressTxt = document.getElementById('uploadProgressText');
+            const progressBar = document.getElementById('uploadProgressBar');
             progress.style.display = 'flex';
+
+            let successCount = 0, failCount = 0;
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                progressText.textContent = `Đang upload ${i + 1}/${files.length}: ${file.name}`;
+                const fileLabel = `[${i + 1}/${files.length}] ${file.name}`;
 
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('folder', currentFolder);
+                progressTxt.textContent = `Đang chuẩn bị: ${fileLabel} (${formatSize(file.size)})`;
+                if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = 'linear-gradient(90deg,#3b82f6,#6366f1)'; }
 
-                try {
-                    const res = await fetch('/api/files/upload', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + token },
-                        body: formData
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        alert('Lỗi upload ' + file.name + ': ' + data.message);
+                const result = await uploadFileChunked(
+                    file,
+                    currentFolder,
+                    (pct, sent, total, chunkIdx, totalChunks) => {
+                        progressTxt.textContent = `${fileLabel} — ${formatSize(sent)} / ${formatSize(total)} (${pct}%) · chunk ${chunkIdx}/${totalChunks}`;
+                        if (progressBar) progressBar.style.width = pct + '%';
                     }
-                } catch (err) {
-                    alert('Lỗi kết nối khi upload ' + file.name);
+                );
+
+                if (result.ok) {
+                    successCount++;
+                    if (progressBar) progressBar.style.background = '#10b981';
+                    progressTxt.textContent = `✅ Xong: ${file.name}`;
+                    showToast(`✅ Upload xong: ${file.name}`);
+                    await new Promise(r => setTimeout(r, 600));
+                } else {
+                    failCount++;
+                    if (progressBar) progressBar.style.background = '#ef4444';
+                    progressTxt.textContent = `❌ ${file.name}: ${result.msg}`;
+                    showToast(`❌ ${file.name}: ${result.msg}`, 'error');
+                    await new Promise(r => setTimeout(r, 2500));
                 }
             }
 
             progress.style.display = 'none';
+            if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = 'linear-gradient(90deg,#3b82f6,#6366f1)'; }
             e.target.value = '';
 
-            // Reload danh sách file và storage
-            await loadFiles();
-            await loadStorageInfo();
+            if (successCount > 0) {
+                await loadFiles();
+                await loadStorageInfo();
+            }
         });
 
         // ===== DOWNLOAD FILE =====
@@ -1876,6 +2063,392 @@
             const wrap = document.getElementById('pw-strength-wrap');
             if (wrap) wrap.classList.add('hidden');
         }
+
+        // ══════════════════════════════════════════════
+        // SELECTION STATE
+        // ══════════════════════════════════════════════
+        let selectedIds = new Set(); // Set of file IDs (strings)
+
+        function updateSelectionUI() {
+            const count = selectedIds.size;
+            const toolbar = document.getElementById('selectionToolbar');
+            document.getElementById('selCount').textContent = count;
+            if (count > 0) {
+                toolbar.style.display = 'flex';
+                lucide.createIcons();
+            } else {
+                toolbar.style.display = 'none';
+            }
+            // sync checkboxes
+            document.querySelectorAll('#fileTableBody tr.file-row').forEach(row => {
+                const cb = row.querySelector('input[type=checkbox]');
+                const sel = selectedIds.has(row.dataset.id);
+                if (cb) cb.checked = sel;
+                row.style.background = sel ? '#eff6ff' : '';
+            });
+            document.querySelectorAll('#gridView .grid-card').forEach(card => {
+                const sel = selectedIds.has(card.dataset.id);
+                card.style.background = sel ? '#eff6ff' : '';
+                card.style.borderColor = sel ? '#93c5fd' : '';
+            });
+        }
+
+        function toggleSelect(id) {
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            updateSelectionUI();
+        }
+
+        function selectAllFiles() {
+            currentFiles.filter(f => f._type === 'file').forEach(f => selectedIds.add(String(f.id)));
+            updateSelectionUI();
+        }
+
+        function clearSelection() {
+            selectedIds.clear();
+            updateSelectionUI();
+        }
+
+        // Patch checkbox clicks in table
+        document.getElementById('fileTableBody').addEventListener('click', function(e) {
+            const cb = e.target.closest('input[type=checkbox]');
+            if (!cb) return;
+            const row = cb.closest('tr.file-row');
+            if (!row || row.dataset.isFolder === 'true') return;
+            e.stopPropagation();
+            toggleSelect(row.dataset.id);
+        });
+
+        // Header checkbox → select all
+        document.querySelector('#listView thead input[type=checkbox]').addEventListener('change', function(e) {
+            if (this.checked) selectAllFiles();
+            else clearSelection();
+        });
+
+        // ══════════════════════════════════════════════
+        // DRAG TO SELECT
+        // ══════════════════════════════════════════════
+        let dragStart = null;
+        const dragBox = document.getElementById('dragSelectBox');
+
+        document.getElementById('mainContent').addEventListener('mousedown', function(e) {
+            // Only start drag if clicking on empty area (not a row/card/button)
+            if (e.target.closest('tr.file-row, .grid-card, button, input, a')) return;
+            if (e.button !== 0) return;
+            dragStart = { x: e.clientX, y: e.clientY };
+            dragBox.style.display = 'block';
+            dragBox.style.left = e.clientX + 'px';
+            dragBox.style.top = e.clientY + 'px';
+            dragBox.style.width = '0';
+            dragBox.style.height = '0';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!dragStart) return;
+            const x = Math.min(e.clientX, dragStart.x);
+            const y = Math.min(e.clientY, dragStart.y);
+            const w = Math.abs(e.clientX - dragStart.x);
+            const h = Math.abs(e.clientY - dragStart.y);
+            dragBox.style.left = x + 'px';
+            dragBox.style.top = y + 'px';
+            dragBox.style.width = w + 'px';
+            dragBox.style.height = h + 'px';
+
+            // Highlight rows inside selection rect
+            const rect = { x, y, right: x + w, bottom: y + h };
+            document.querySelectorAll('#fileTableBody tr.file-row').forEach(row => {
+                if (row.dataset.isFolder === 'true') return;
+                const r = row.getBoundingClientRect();
+                const inside = r.right > rect.x && r.left < rect.right && r.bottom > rect.y && r.top < rect.bottom;
+                row.style.background = inside ? '#eff6ff' : '';
+            });
+            document.querySelectorAll('#gridView .grid-card').forEach(card => {
+                const r = card.getBoundingClientRect();
+                const inside = r.right > rect.x && r.left < rect.right && r.bottom > rect.y && r.top < rect.bottom;
+                card.style.background = inside ? '#eff6ff' : '';
+                card.style.borderColor = inside ? '#93c5fd' : '';
+            });
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (!dragStart) return;
+            const x = Math.min(e.clientX, dragStart.x);
+            const y = Math.min(e.clientY, dragStart.y);
+            const w = Math.abs(e.clientX - dragStart.x);
+            const h = Math.abs(e.clientY - dragStart.y);
+            const rect = { x, y, right: x + w, bottom: y + h };
+
+            if (w > 8 || h > 8) { // only select if dragged enough
+                const newSelected = new Set(selectedIds);
+                document.querySelectorAll('#fileTableBody tr.file-row').forEach(row => {
+                    if (row.dataset.isFolder === 'true') return;
+                    const r = row.getBoundingClientRect();
+                    if (r.right > rect.x && r.left < rect.right && r.bottom > rect.y && r.top < rect.bottom) {
+                        newSelected.add(row.dataset.id);
+                    }
+                });
+                document.querySelectorAll('#gridView .grid-card').forEach(card => {
+                    const r = card.getBoundingClientRect();
+                    if (r.right > rect.x && r.left < rect.right && r.bottom > rect.y && r.top < rect.bottom) {
+                        newSelected.add(card.dataset.id);
+                    }
+                });
+                selectedIds = newSelected;
+                updateSelectionUI();
+            }
+
+            dragStart = null;
+            dragBox.style.display = 'none';
+        });
+
+        // ══════════════════════════════════════════════
+        // CONTEXT MENU (right-click)
+        // ══════════════════════════════════════════════
+        let ctxTargetId = null;
+        let ctxTargetName = null;
+        let ctxTargetMime = null;
+        let ctxIsBulk = false;
+
+        function hideCtxMenu() {
+            document.getElementById('ctxMenu').style.display = 'none';
+        }
+
+        function showCtxMenu(e, id, name, mime, isBulk) {
+            e.preventDefault();
+            ctxTargetId = id;
+            ctxTargetName = name;
+            ctxTargetMime = mime;
+            ctxIsBulk = isBulk;
+
+            const menu = document.getElementById('ctxMenu');
+            const bulkSection = document.getElementById('ctxBulkSection');
+            const isSingleFile = !isBulk && id;
+
+            // Title
+            if (isBulk) {
+                document.getElementById('ctxTitle').textContent = `${selectedIds.size} file đã chọn`;
+            } else {
+                document.getElementById('ctxTitle').textContent = name || 'File';
+            }
+
+            // Show/hide bulk section
+            if (isBulk && selectedIds.size > 1) {
+                bulkSection.style.display = 'block';
+                document.getElementById('ctxBulkCount').textContent = selectedIds.size;
+                document.getElementById('ctxBulkCount2').textContent = selectedIds.size;
+                // Hide single actions
+                document.getElementById('ctxBtnDownload').style.display = 'none';
+                document.getElementById('ctxBtnShare').style.display = 'none';
+            } else {
+                bulkSection.style.display = 'none';
+                document.getElementById('ctxBtnDownload').style.display = 'flex';
+                document.getElementById('ctxBtnShare').style.display = 'flex';
+            }
+
+            // Position
+            const vw = window.innerWidth, vh = window.innerHeight;
+            menu.style.display = 'block';
+            const mw = menu.offsetWidth, mh = menu.offsetHeight;
+            let left = e.clientX + 4, top = e.clientY + 4;
+            if (left + mw > vw - 8) left = e.clientX - mw - 4;
+            if (top + mh > vh - 8) top = e.clientY - mh - 4;
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            lucide.createIcons();
+        }
+
+        // Attach context menu to table rows
+        document.getElementById('fileTableBody').addEventListener('contextmenu', function(e) {
+            const row = e.target.closest('tr.file-row');
+            if (!row || row.dataset.isFolder === 'true') return;
+            const id = row.dataset.id;
+            const name = row.dataset.name;
+            const mime = row.dataset.mime;
+
+            // If this row is in selection, show bulk menu
+            if (selectedIds.has(id) && selectedIds.size > 1) {
+                showCtxMenu(e, id, name, mime, true);
+            } else {
+                // Select just this row
+                if (!selectedIds.has(id)) { selectedIds.clear(); selectedIds.add(id); updateSelectionUI(); }
+                showCtxMenu(e, id, name, mime, false);
+            }
+        });
+
+        document.getElementById('gridView').addEventListener('contextmenu', function(e) {
+            const card = e.target.closest('.grid-card');
+            if (!card) return;
+            const id = card.dataset.id;
+            const name = card.dataset.name;
+            const mime = card.dataset.mime;
+            if (selectedIds.has(id) && selectedIds.size > 1) {
+                showCtxMenu(e, id, name, mime, true);
+            } else {
+                if (!selectedIds.has(id)) { selectedIds.clear(); selectedIds.add(id); updateSelectionUI(); }
+                showCtxMenu(e, id, name, mime, false);
+            }
+        });
+
+        // Hide on click/scroll outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#ctxMenu')) hideCtxMenu();
+        });
+        document.addEventListener('scroll', hideCtxMenu, true);
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { hideCtxMenu(); clearSelection(); } });
+
+        // Context menu actions
+        function ctxDownload() {
+            hideCtxMenu();
+            if (ctxTargetId) downloadFile(ctxTargetId, ctxTargetName);
+        }
+
+        function ctxShare() {
+            hideCtxMenu();
+            if (ctxTargetId) openShareModal(ctxTargetId, ctxTargetName);
+        }
+
+        function ctxDelete() {
+            hideCtxMenu();
+            if (ctxTargetId) openDeleteModal(ctxTargetId, ctxTargetName);
+        }
+
+        function ctxMoveToProject() {
+            hideCtxMenu();
+            _pendingMoveIds = [ctxTargetId];
+            openMoveProjectModal([ctxTargetId]);
+        }
+
+        function ctxBulkDelete() {
+            hideCtxMenu();
+            bulkDeleteSelected();
+        }
+
+        function ctxBulkMoveToProject() {
+            hideCtxMenu();
+            bulkMoveToProject();
+        }
+
+        // ══════════════════════════════════════════════
+        // BULK DELETE
+        // ══════════════════════════════════════════════
+        async function bulkDeleteSelected() {
+            const ids = [...selectedIds];
+            if (!ids.length) return;
+            if (!confirm(`Chuyển ${ids.length} file vào thùng rác?`)) return;
+            let ok = 0, fail = 0;
+            for (const id of ids) {
+                const res = await api('/api/files/' + id, { method: 'DELETE' });
+                if (res.ok) ok++; else fail++;
+            }
+            clearSelection();
+            showToast(fail ? `Đã xóa ${ok}, lỗi ${fail}` : `🗑️ Đã xóa ${ok} file`);
+            loadFiles(); loadStorageInfo();
+        }
+
+        // ══════════════════════════════════════════════
+        // MOVE TO PROJECT
+        // ══════════════════════════════════════════════
+        let _pendingMoveIds = [];
+
+        function bulkMoveToProject() {
+            _pendingMoveIds = [...selectedIds];
+            openMoveProjectModal(_pendingMoveIds);
+        }
+
+        async function openMoveProjectModal(ids) {
+            _pendingMoveIds = ids;
+            const subtitle = ids.length > 1 ? `${ids.length} file sẽ được upload vào project` : 'File sẽ được upload vào project';
+            document.getElementById('moveProjectSubtitle').textContent = subtitle;
+            document.getElementById('moveProjectModal').classList.remove('hidden');
+            lucide.createIcons();
+
+            // Load projects
+            const list = document.getElementById('projectListForMove');
+            list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Đang tải...</p>';
+            try {
+                const res = await api('/api/projects');
+                const projects = await res.json();
+                if (!projects.length) {
+                    list.innerHTML = '<p class="text-xs text-gray-400 text-center py-6">Bạn chưa có project nào.<br><a href="/project.html" class="text-blue-500 underline">Tạo project mới</a></p>';
+                    return;
+                }
+                list.innerHTML = projects.map(p => `
+                    <button onclick="confirmMoveToProject(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                        style="display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:1.5px solid #f1f5f9;border-radius:12px;background:#fff;cursor:pointer;text-align:left;transition:all 0.15s;"
+                        onmouseover="this.style.borderColor='#93c5fd';this.style.background='#eff6ff'"
+                        onmouseout="this.style.borderColor='#f1f5f9';this.style.background='#fff'">
+                        <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i data-lucide="layout-grid" style="width:17px;height:17px;color:#059669;"></i>
+                        </div>
+                        <div style="min-width:0;flex:1;">
+                            <p style="font-size:13px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</p>
+                            <p style="font-size:11px;color:#9ca3af;">${p.member_count} thành viên · ${p.file_count} file · ${p.my_role}</p>
+                        </div>
+                        <i data-lucide="chevron-right" style="width:15px;height:15px;color:#d1d5db;flex-shrink:0;"></i>
+                    </button>
+                `).join('');
+                lucide.createIcons();
+            } catch(err) {
+                list.innerHTML = '<p class="text-xs text-red-400 text-center py-4">Lỗi tải danh sách project</p>';
+            }
+        }
+
+        function closeMoveProjectModal() {
+            document.getElementById('moveProjectModal').classList.add('hidden');
+            _pendingMoveIds = [];
+        }
+
+        async function confirmMoveToProject(projectId, projectName) {
+            closeMoveProjectModal();
+            if (!_pendingMoveIds.length) return;
+
+            const ids = [..._pendingMoveIds];
+            _pendingMoveIds = [];
+
+            // Fetch actual file blobs and re-upload to project
+            let ok = 0, fail = 0;
+            for (const fileId of ids) {
+                try {
+                    // Get file info
+                    const fileInfo = currentFiles.find(f => String(f.id) === String(fileId));
+                    if (!fileInfo || fileInfo._type !== 'file') { fail++; continue; }
+
+                    // Download file blob
+                    const dlRes = await fetch('/api/files/download/' + fileId, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    if (!dlRes.ok) { fail++; continue; }
+                    const blob = await dlRes.blob();
+                    const originalName = fileInfo.original_name || fileInfo.filename || 'file';
+
+                    // Upload to project
+                    const formData = new FormData();
+                    formData.append('file', new File([blob], originalName, { type: fileInfo.mime_type || 'application/octet-stream' }));
+                    const upRes = await fetch('/api/projects/' + projectId + '/files/upload', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        body: formData
+                    });
+                    if (upRes.ok) ok++; else fail++;
+                } catch(e) {
+                    fail++;
+                }
+            }
+
+            clearSelection();
+            if (fail > 0) {
+                showToast(`Đã chuyển ${ok} file vào "${projectName}", lỗi ${fail}`, ok === 0 ? 'error' : 'success');
+            } else {
+                showToast(`✅ Đã chuyển ${ok} file vào project "${projectName}"`);
+            }
+        }
+
+        // Hover style for ctx menu items
+        document.querySelectorAll('.ctx-item').forEach(item => {
+            item.addEventListener('mouseover', () => item.style.background = '#f8fafc');
+            item.addEventListener('mouseout', () => item.style.background = '');
+        });
 
         // ===== INIT =====
         lucide.createIcons();
