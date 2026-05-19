@@ -1,0 +1,10 @@
+GHI CHÚ 
+Nhóm em đã hoàn thiện các yêu cầu của thầy 
+được đánh giá sau khi sử dụng khách sạn
+có them tính năng đặt theo giờ
+đã làm responsive của các trang
+đc xem chi tiết phòng nào đặt rồi thì gửi lịch 
+khách yêu cầu dịch vụ gửi về admin và staff
+làm them trang staff
+staff chỉ đc quyền quản trị khách sạn đc chỉ định 
+them tính năng xuất file excel 

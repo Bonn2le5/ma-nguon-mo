@@ -545,4 +545,38 @@ router.delete('/:id/share-user/:userId', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi thu hồi' }); }
 });
 
+
+// ── PUT /api/files/:id/move — di chuyển file sang thư mục khác ──
+router.put('/:id/move', auth, async (req, res) => {
+  try {
+    const { folder_path } = req.body;
+    if (!folder_path) return res.status(400).json({ message: 'Thiếu folder_path' });
+
+    // Kiểm tra file thuộc user
+    const [[file]] = await db.query(
+      'SELECT id FROM files WHERE id = ? AND user_id = ? AND is_deleted = 0',
+      [req.params.id, req.user.id]
+    );
+    if (!file) return res.status(404).json({ message: 'Không tìm thấy file' });
+
+    // Nếu folder_path không phải root, kiểm tra thư mục đích tồn tại
+    if (folder_path !== '/') {
+      const [folders] = await db.query(
+        'SELECT id FROM folders WHERE user_id = ? AND path = ?',
+        [req.user.id, folder_path]
+      );
+      if (!folders.length) return res.status(404).json({ message: 'Thư mục đích không tồn tại' });
+    }
+
+    await db.query(
+      'UPDATE files SET folder_path = ? WHERE id = ? AND user_id = ?',
+      [folder_path, req.params.id, req.user.id]
+    );
+    res.json({ message: 'Đã di chuyển file', folder_path });
+  } catch (err) {
+    console.error('move error:', err);
+    res.status(500).json({ message: 'Lỗi di chuyển file' });
+  }
+});
+
 module.exports = router;

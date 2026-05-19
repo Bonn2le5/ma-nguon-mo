@@ -613,4 +613,106 @@ router.delete('/:id/files/:fileId', auth, async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════
+// FILE COMMENTS
+// Bảng cần tạo:
+//   CREATE TABLE project_file_comments (
+//     id         INT AUTO_INCREMENT PRIMARY KEY,
+//     project_id INT NOT NULL,
+//     file_id    INT NOT NULL,
+//     user_id    INT NOT NULL,
+//     content    TEXT NOT NULL,
+//     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+//     FOREIGN KEY (project_id) REFERENCES projects(id)      ON DELETE CASCADE,
+//     FOREIGN KEY (file_id)    REFERENCES project_files(id) ON DELETE CASCADE,
+//     FOREIGN KEY (user_id)    REFERENCES users(id)         ON DELETE CASCADE
+//   );
+// ══════════════════════════════════════════════
+
+// GET /api/projects/:id/files/:fileId/comments
+router.get('/:id/files/:fileId/comments', auth, async (req, res) => {
+  try {
+    const member = await getMember(req.params.id, req.user.id);
+    if (!member) return res.status(403).json({ message: 'Không có quyền' });
+
+    const [[file]] = await db.query(
+      'SELECT id FROM project_files WHERE id = ? AND project_id = ?',
+      [req.params.fileId, req.params.id]
+    );
+    if (!file) return res.status(404).json({ message: 'Không tìm thấy file' });
+
+    const [comments] = await db.query(
+      `SELECT pfc.id, pfc.content, pfc.created_at,
+              u.id as user_id, u.username
+       FROM project_file_comments pfc
+       JOIN users u ON u.id = pfc.user_id
+       WHERE pfc.project_id = ? AND pfc.file_id = ?
+       ORDER BY pfc.created_at ASC`,
+      [req.params.id, req.params.fileId]
+    );
+    res.json(comments);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi lấy bình luận' });
+  }
+});
+
+// POST /api/projects/:id/files/:fileId/comments
+router.post('/:id/files/:fileId/comments', auth, async (req, res) => {
+  try {
+    const member = await getMember(req.params.id, req.user.id);
+    if (!member) return res.status(403).json({ message: 'Không có quyền' });
+
+    const [[file]] = await db.query(
+      'SELECT id FROM project_files WHERE id = ? AND project_id = ?',
+      [req.params.fileId, req.params.id]
+    );
+    if (!file) return res.status(404).json({ message: 'Không tìm thấy file' });
+
+    const content = (req.body.content || '').trim();
+    if (!content) return res.status(400).json({ message: 'Nội dung không được trống' });
+    if (content.length > 2000) return res.status(400).json({ message: 'Bình luận tối đa 2000 ký tự' });
+
+    const [result] = await db.query(
+      'INSERT INTO project_file_comments (project_id, file_id, user_id, content) VALUES (?,?,?,?)',
+      [req.params.id, req.params.fileId, req.user.id, content]
+    );
+
+    const [[comment]] = await db.query(
+      `SELECT pfc.id, pfc.content, pfc.created_at, u.id as user_id, u.username
+       FROM project_file_comments pfc JOIN users u ON u.id = pfc.user_id
+       WHERE pfc.id = ?`,
+      [result.insertId]
+    );
+    res.json(comment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi đăng bình luận' });
+  }
+});
+
+// DELETE /api/projects/:id/files/:fileId/comments/:commentId
+router.delete('/:id/files/:fileId/comments/:commentId', auth, async (req, res) => {
+  try {
+    const member = await getMember(req.params.id, req.user.id);
+    if (!member) return res.status(403).json({ message: 'Không có quyền' });
+
+    const [[comment]] = await db.query(
+      'SELECT user_id FROM project_file_comments WHERE id = ? AND file_id = ? AND project_id = ?',
+      [req.params.commentId, req.params.fileId, req.params.id]
+    );
+    if (!comment) return res.status(404).json({ message: 'Không tìm thấy bình luận' });
+
+    if (comment.user_id !== req.user.id && member.role !== 'owner') {
+      return res.status(403).json({ message: 'Không có quyền xóa bình luận này' });
+    }
+
+    await db.query('DELETE FROM project_file_comments WHERE id = ?', [req.params.commentId]);
+    res.json({ message: 'Đã xóa bình luận' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi xóa bình luận' });
+  }
+});
+
 module.exports = router;
