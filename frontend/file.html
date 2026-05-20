@@ -94,6 +94,7 @@
 
             /* Hide sort text on mobile - keep select small */
             #sortSelect { font-size:12px !important; padding: 6px 6px !important; }
+            #dateFilterWrapper { display:none !important; }
 
             /* Upload progress */
             #uploadProgress { padding: 6px 12px !important; }
@@ -224,6 +225,32 @@
                     <option value="date">Mới nhất</option>
                     <option value="size">Kích thước</option>
                 </select>
+
+                <!-- Date filter -->
+                <div id="dateFilterWrapper" style="display:flex;align-items:center;gap:4px;">
+                    <div style="position:relative;">
+                        <i data-lucide="calendar" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#9ca3af;pointer-events:none;"></i>
+                        <input type="date" id="dateFrom"
+                            style="padding:7px 8px 7px 26px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:12px;background:#f9fafb;outline:none;color:#374151;cursor:pointer;width:130px;"
+                            title="Từ ngày"
+                            onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
+                            onblur="this.style.borderColor='#e5e7eb';this.style.background='#f9fafb'">
+                    </div>
+                    <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">–</span>
+                    <div style="position:relative;">
+                        <i data-lucide="calendar" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#9ca3af;pointer-events:none;"></i>
+                        <input type="date" id="dateTo"
+                            style="padding:7px 8px 7px 26px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:12px;background:#f9fafb;outline:none;color:#374151;cursor:pointer;width:130px;"
+                            title="Đến ngày"
+                            onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
+                            onblur="this.style.borderColor='#e5e7eb';this.style.background='#f9fafb'">
+                    </div>
+                    <button id="clearDateFilter" onclick="clearDateFilter()" title="Xóa bộ lọc ngày"
+                        style="display:none;padding:6px 8px;border:1.5px solid #fca5a5;border-radius:9px;background:#fff5f5;color:#ef4444;cursor:pointer;font-size:12px;transition:all 0.15s;"
+                        onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff5f5'">
+                        <i data-lucide="x" style="width:13px;height:13px;"></i>
+                    </button>
+                </div>
 
                 <!-- View toggle -->
                 <div style="display:flex;background:#f1f5f9;border-radius:9px;padding:3px;gap:2px;">
@@ -1787,26 +1814,67 @@
 
         // ===== SEARCH =====
         document.getElementById('searchInput').addEventListener('input', (e) => {
-            const q = e.target.value.toLowerCase();
-            currentFiles = allFiles.filter(f => {
-                const name = (f.original_name || f.name || '').toLowerCase();
-                return name.includes(q);
-            });
-            renderFiles();
+            applyDateFilter();
         });
 
         // ===== SORT =====
         document.getElementById('sortSelect').addEventListener('change', (e) => {
+            applyDateFilter();
+        });
+
+        // ===== DATE FILTER =====
+        function applyDateFilter() {
+            const from = document.getElementById('dateFrom').value;
+            const to   = document.getElementById('dateTo').value;
+            const clearBtn = document.getElementById('clearDateFilter');
+
+            const hasFilter = from || to;
+            clearBtn.style.display = hasFilter ? 'flex' : 'none';
+
+            // Xây lại currentFiles từ allFiles (giữ kết quả search nếu có)
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = allFiles.filter(f => {
+                const name = (f.original_name || f.name || '').toLowerCase();
+                return name.includes(q);
+            });
+
+            if (from || to) {
+                const fromDate = from ? new Date(from + 'T00:00:00') : null;
+                // Đến cuối ngày "to"
+                const toDate   = to   ? new Date(to   + 'T23:59:59') : null;
+                filtered = filtered.filter(f => {
+                    if (!f.created_at) return false;
+                    const d = new Date(f.created_at);
+                    if (fromDate && d < fromDate) return false;
+                    if (toDate   && d > toDate)   return false;
+                    return true;
+                });
+            }
+
+            currentFiles = filtered;
+
+            // Áp lại sort hiện tại
+            const sortVal = document.getElementById('sortSelect').value;
             const getName = (f) => (f.original_name || f.name || '').toLowerCase();
-            if (e.target.value === 'name') {
+            if (sortVal === 'name') {
                 currentFiles.sort((a, b) => getName(a).localeCompare(getName(b)));
-            } else if (e.target.value === 'size') {
+            } else if (sortVal === 'size') {
                 currentFiles.sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
             } else {
                 currentFiles.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
+
             renderFiles();
-        });
+        }
+
+        function clearDateFilter() {
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value   = '';
+            applyDateFilter();
+        }
+
+        document.getElementById('dateFrom').addEventListener('change', applyDateFilter);
+        document.getElementById('dateTo').addEventListener('change', applyDateFilter);
 
         // ===== CLOSE MODAL ON OUTSIDE CLICK =====
         ['shareModal', 'deleteModal', 'createFolderModal'].forEach(id => {
@@ -2450,7 +2518,614 @@
             item.addEventListener('mouseout', () => item.style.background = '');
         });
 
-        // ===== INIT =====
+        (function setupDropZoneUpload() {
+    // Overlay toàn màn hình khi kéo file vào
+    const overlay = document.createElement('div');
+    overlay.id = 'globalDropOverlay';
+    overlay.innerHTML = `
+        <div style="text-align:center;">
+            <div style="font-size:64px;margin-bottom:16px;">📂</div>
+            <p style="font-size:20px;font-weight:700;color:#2563eb;margin-bottom:6px;">Thả file để tải lên</p>
+            <p style="font-size:14px;color:#6b7280;">Thả vào đây để upload vào thư mục hiện tại</p>
+        </div>`;
+    Object.assign(overlay.style, {
+        position: 'fixed', inset: '0', zIndex: '9999',
+        background: 'rgba(59,130,246,0.12)',
+        backdropFilter: 'blur(2px)',
+        border: '3px dashed #3b82f6',
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        borderRadius: '0',
+        transition: 'opacity 0.15s'
+    });
+    document.body.appendChild(overlay);
+
+    let dragCounter = 0;
+
+    document.addEventListener('dragenter', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        dragCounter++;
+        overlay.style.display = 'flex';
+        overlay.style.pointerEvents = 'all';
+    });
+
+    document.addEventListener('dragleave', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        dragCounter--;
+        if (dragCounter <= 0) {
+            dragCounter = 0;
+            overlay.style.display = 'none';
+            overlay.style.pointerEvents = 'none';
+        }
+    });
+
+    document.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('drop', async (e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragCounter = 0;
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none';
+
+        const files = Array.from(e.dataTransfer.files);
+        if (!files.length) return;
+
+        // Reuse upload logic từ fileInput change handler
+        const progress    = document.getElementById('uploadProgress');
+        const progressTxt = document.getElementById('uploadProgressText');
+        const progressBar = document.getElementById('uploadProgressBar');
+        if (progress) progress.style.display = 'flex';
+
+        let successCount = 0, failCount = 0;
+        const folder = typeof currentFolder !== 'undefined' ? currentFolder : '/';
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileLabel = `[${i + 1}/${files.length}] ${file.name}`;
+            if (progressTxt) progressTxt.textContent = `Đang chuẩn bị: ${fileLabel}`;
+            if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = 'linear-gradient(90deg,#3b82f6,#6366f1)'; }
+
+            const result = await uploadFileChunked(
+                file, folder,
+                (pct, sent, total, chunkIdx, totalChunks) => {
+                    if (progressTxt) progressTxt.textContent = `${fileLabel} — ${formatSize(sent)} / ${formatSize(total)} (${pct}%) · chunk ${chunkIdx}/${totalChunks}`;
+                    if (progressBar) progressBar.style.width = pct + '%';
+                }
+            );
+
+            if (result.ok) {
+                successCount++;
+                if (progressBar) progressBar.style.background = '#10b981';
+                if (progressTxt) progressTxt.textContent = `✅ Xong: ${file.name}`;
+                showToast(`✅ Upload xong: ${file.name}`);
+                await new Promise(r => setTimeout(r, 600));
+            } else {
+                failCount++;
+                if (progressBar) progressBar.style.background = '#ef4444';
+                if (progressTxt) progressTxt.textContent = `❌ ${file.name}: ${result.msg}`;
+                showToast(`❌ ${file.name}: ${result.msg}`, 'error');
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (progress) progress.style.display = 'none';
+        if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = 'linear-gradient(90deg,#3b82f6,#6366f1)'; }
+
+        if (successCount > 0) {
+            await loadFiles();
+            if (typeof loadStorageInfo === 'function') await loadStorageInfo();
+        }
+    });
+})();
+
+
+// ── PHẦN 2: KÉO FILE VÀO THƯ MỤC (drag row → folder row) ───────────────────
+
+(function setupFileToDirDrag() {
+    // Trạng thái drag
+    let draggingFileId  = null;
+    let draggingName    = '';
+    let ghostEl         = null;
+
+    // Tạo ghost element theo chuột
+    function createGhost(name) {
+        const g = document.createElement('div');
+        g.id = 'fileDragGhost';
+        g.textContent = '📄 ' + name;
+        Object.assign(g.style, {
+            position: 'fixed', zIndex: '10000',
+            background: '#eff6ff', border: '1.5px solid #93c5fd',
+            borderRadius: '8px', padding: '6px 14px',
+            fontSize: '13px', fontWeight: '600', color: '#1d4ed8',
+            pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            display: 'none', whiteSpace: 'nowrap'
+        });
+        document.body.appendChild(g);
+        return g;
+    }
+
+    function removeGhost() {
+        const g = document.getElementById('fileDragGhost');
+        if (g) g.remove();
+        ghostEl = null;
+    }
+
+    // Highlight thư mục đang hover
+    function highlightFolder(el, on) {
+        if (!el) return;
+        if (on) {
+            el.style.background = '#eff6ff';
+            el.style.outline = '2px solid #3b82f6';
+            el.style.outlineOffset = '-2px';
+        } else {
+            el.style.background = '';
+            el.style.outline = '';
+        }
+    }
+
+    // Bắt đầu drag trên file row (list view)
+    document.addEventListener('mousedown', (e) => {
+        const row = e.target.closest('tr.file-row');
+        if (!row) return;
+        const isFolder = row.dataset.isFolder === 'true';
+        if (isFolder) return; // chỉ drag file
+        // Không drag khi click nút action
+        if (e.target.closest('button, a, input, label')) return;
+        if (e.button !== 0) return;
+
+        draggingFileId = row.dataset.id;
+        draggingName   = row.dataset.name || 'file';
+
+        let didStart = false;
+        const startX = e.clientX, startY = e.clientY;
+
+        function onMove(ev) {
+            const dx = Math.abs(ev.clientX - startX);
+            const dy = Math.abs(ev.clientY - startY);
+            if (!didStart && (dx > 6 || dy > 6)) {
+                didStart = true;
+                ghostEl = createGhost(draggingName);
+                row.style.opacity = '0.4';
+            }
+            if (ghostEl) {
+                ghostEl.style.left  = (ev.clientX + 14) + 'px';
+                ghostEl.style.top   = (ev.clientY - 14) + 'px';
+                ghostEl.style.display = 'block';
+            }
+            // Highlight thư mục đang hover
+            const target = document.elementFromPoint(ev.clientX, ev.clientY);
+            const folderRow = target ? target.closest('tr.file-row[data-is-folder="true"]') : null;
+            document.querySelectorAll('tr.file-row[data-is-folder="true"]').forEach(r => highlightFolder(r, false));
+            if (folderRow) highlightFolder(folderRow, true);
+        }
+
+        function onUp(ev) {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            row.style.opacity = '';
+            removeGhost();
+            document.querySelectorAll('tr.file-row[data-is-folder="true"]').forEach(r => highlightFolder(r, false));
+
+            if (!didStart || !draggingFileId) { draggingFileId = null; return; }
+
+            const target = document.elementFromPoint(ev.clientX, ev.clientY);
+            const folderRow = target ? target.closest('tr.file-row[data-is-folder="true"]') : null;
+
+            if (folderRow) {
+                const destPath = folderRow.dataset.path;
+                const destName = folderRow.dataset.name;
+                moveFileToFolder(draggingFileId, draggingName, destPath, destName);
+            }
+
+            draggingFileId = null;
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+
+    // Thực hiện move file
+    async function moveFileToFolder(fileId, fileName, folderPath, folderName) {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/files/' + fileId + '/move', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ folder_path: folderPath })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(`✅ Đã di chuyển "${fileName}" vào "${folderName}"`);
+                await loadFiles();
+            } else {
+                showToast(`❌ ${data.message || 'Lỗi di chuyển'}`, 'error');
+            }
+        } catch (err) {
+            showToast('❌ Lỗi kết nối', 'error');
+        }
+    }
+})();
+
+
+// ── PHẦN 3: KÉO FILE VÀO PROJECT (drop vào sidebar project) ─────────────────
+
+(function setupFileToDirDragProject() {
+    // Tạo drop zone project trong sidebar
+    function injectProjectDropZones() {
+        // Tìm sidebar chứa "Di chuyển tới project" hoặc nav project
+        const nav = document.querySelector('#mainSidebar') || document.querySelector('.sidebar');
+        if (!nav) return;
+
+        // Tìm xem đã có section project chưa, nếu có thì thêm visual hint
+        const projectSection = nav.querySelector('[data-section="project"]') || nav.querySelector('.nav-item[onclick*="project"]');
+        if (projectSection) {
+            projectSection.dataset.dropTarget = 'project';
+        }
+    }
+
+    // Khi drag bắt đầu (custom event từ file row drag)
+    // Chúng ta dùng right-click context menu "Kéo vào project" thay vì drag vì
+    // cần fetch danh sách project trước — đây là UX an toàn hơn.
+
+    // Override: thêm nút "Chuyển vào project" vào context menu nếu có
+    const ctxMenu = document.getElementById('ctxMenu');
+    if (ctxMenu) {
+        // Kiểm tra đã có chưa
+        if (!ctxMenu.querySelector('[data-action="drag-to-project"]')) {
+            const existing = ctxMenu.querySelector('.ctx-item[onclick*="MoveProject"]');
+            if (existing) {
+                // Nút đã tồn tại — gắn drag support cho file row
+                setupRowDragToProject();
+            }
+        }
+    } else {
+        setupRowDragToProject();
+    }
+
+    function setupRowDragToProject() {
+        // Thêm drag vào project sidebar pill nếu có project list ở sidebar
+        let projectDropItems = [];
+
+        // Tạo floating project drop panel khi đang drag file
+        function createProjectDropPanel(fileIds) {
+            removeProjectDropPanel();
+            const token = localStorage.getItem('token');
+            fetch('/api/projects', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(r => r.json())
+                .then(projects => {
+                    if (!projects.length) return;
+                    const panel = document.createElement('div');
+                    panel.id = 'projectDropPanel';
+                    Object.assign(panel.style, {
+                        position: 'fixed', right: '16px', top: '50%',
+                        transform: 'translateY(-50%)',
+                        zIndex: '10001', background: '#fff',
+                        border: '1.5px solid #e5e7eb', borderRadius: '14px',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                        padding: '12px', minWidth: '200px', maxWidth: '260px'
+                    });
+                    panel.innerHTML = `
+                        <p style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:8px;padding:0 4px;">
+                            📁 THẢ VÀO PROJECT
+                        </p>
+                        ${projects.slice(0, 6).map(p => `
+                            <div class="project-drop-item" data-pid="${p.id}" data-pname="${p.name.replace(/"/g,'&quot;')}"
+                                style="padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13px;
+                                       font-weight:500;color:#374151;display:flex;align-items:center;gap:8px;
+                                       transition:background 0.12s;border:1.5px solid transparent;">
+                                <span style="font-size:16px;">🗂️</span>
+                                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</span>
+                            </div>`).join('')}`;
+
+                    panel.querySelectorAll('.project-drop-item').forEach(item => {
+                        item.addEventListener('mouseenter', () => {
+                            item.style.background = '#eff6ff';
+                            item.style.borderColor = '#93c5fd';
+                        });
+                        item.addEventListener('mouseleave', () => {
+                            item.style.background = '';
+                            item.style.borderColor = 'transparent';
+                        });
+                        item.addEventListener('mouseup', async () => {
+                            const pId   = item.dataset.pid;
+                            const pName = item.dataset.pname;
+                            removeProjectDropPanel();
+                            await copyFilesToProject(fileIds, pId, pName);
+                        });
+                    });
+
+                    document.body.appendChild(panel);
+                    projectDropItems = panel.querySelectorAll('.project-drop-item');
+                })
+                .catch(() => {});
+        }
+
+        function removeProjectDropPanel() {
+            const p = document.getElementById('projectDropPanel');
+            if (p) p.remove();
+        }
+
+        // Tích hợp với drag đã có ở PHẦN 2 — thêm project panel khi đang drag file
+        // Hook vào mousedown trên file row để cũng show project panel
+        let dragTimer = null;
+        document.addEventListener('mousedown', (e) => {
+            const row = e.target.closest('tr.file-row');
+            if (!row || row.dataset.isFolder === 'true') return;
+            if (e.target.closest('button, a, input, label')) return;
+            if (e.button !== 0) return;
+
+            const startX = e.clientX, startY = e.clientY;
+            let panelShown = false;
+
+            function onMove(ev) {
+                const dx = Math.abs(ev.clientX - startX);
+                const dy = Math.abs(ev.clientY - startY);
+                if (!panelShown && (dx > 6 || dy > 6)) {
+                    panelShown = true;
+                    createProjectDropPanel([row.dataset.id]);
+                }
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                setTimeout(removeProjectDropPanel, 200);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Copy file sang project (tải về rồi upload lại — cách hiện tại trong code gốc)
+        async function copyFilesToProject(fileIds, projectId, projectName) {
+            const token = localStorage.getItem('token');
+            let ok = 0, fail = 0;
+            showToast(`⏳ Đang chuyển ${fileIds.length} file vào "${projectName}"...`);
+
+            for (const id of fileIds) {
+                try {
+                    // Lấy info file
+                    const allFiles = typeof currentFiles !== 'undefined' ? currentFiles : [];
+                    const fileInfo = allFiles.find(f => String(f.id) === String(id));
+                    if (!fileInfo) { fail++; continue; }
+
+                    const dlRes = await fetch('/api/files/download/' + id, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    if (!dlRes.ok) { fail++; continue; }
+                    const blob = await dlRes.blob();
+                    const originalName = fileInfo.original_name || fileInfo.filename || 'file';
+
+                    const formData = new FormData();
+                    formData.append('file', new File([blob], originalName, { type: fileInfo.mime_type || 'application/octet-stream' }));
+
+                    const upRes = await fetch('/api/projects/' + projectId + '/files/upload', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        body: formData
+                    });
+                    if (upRes.ok) ok++; else fail++;
+                } catch { fail++; }
+            }
+
+            if (fail > 0) {
+                showToast(`Đã chuyển ${ok} file, lỗi ${fail}`, ok === 0 ? 'error' : 'success');
+            } else {
+                showToast(`✅ Đã chuyển ${ok} file vào project "${projectName}"`);
+            }
+        }
+    }
+})();
+
+
+// ── PHẦN 4: TAG — QUICK-TAG INLINE (hover vào file row thấy + badge nhanh) ──
+
+(function setupQuickTag() {
+    // Khi click btn-tag trong list view → mở tag modal (đã có)
+    // Thêm: hiển thị tags đẹp hơn và shortcut tạo tag nhanh
+    // Phần này enhance modal tag hiện có
+
+    // Auto-submit tag khi click ra ngoài modal (UX cải thiện)
+    const tagModal = document.getElementById('tagModal');
+    if (tagModal) {
+        tagModal.addEventListener('click', async (e) => {
+            // Nếu click đúng backdrop (không phải content)
+            if (e.target === tagModal) {
+                // Auto-save trước khi đóng
+                const saveBtn = tagModal.querySelector('button[onclick*="saveTag"]')
+                             || tagModal.querySelector('button.btn-save-tags');
+                if (saveBtn) saveBtn.click();
+                else if (typeof saveTagsForFile === 'function') await saveTagsForFile();
+                else if (typeof closeTagModal === 'function') closeTagModal();
+            }
+        });
+    }
+
+    // Thêm keyboard shortcut Enter để tạo tag mới trong modal
+    const tagNameInput = document.getElementById('newTagName');
+    if (tagNameInput) {
+        tagNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const createBtn = document.querySelector('button[onclick*="createTag"]')
+                               || document.querySelector('#tagModal button.btn-create-tag');
+                if (createBtn) createBtn.click();
+                else if (typeof createTag === 'function') createTag();
+            }
+        });
+    }
+})();
+
+
+// ── PHẦN 5: DROP ZONE TRONG GRID VIEW (card vào folder card) ─────────────────
+
+(function setupGridDragToFolder() {
+    const gridView = document.getElementById('gridView');
+    if (!gridView) return;
+
+    let draggingId = null, draggingName2 = '';
+
+    gridView.addEventListener('mousedown', (e) => {
+        const card = e.target.closest('.grid-item-preview, .grid-card');
+        if (!card) return;
+        if (card.dataset.isFolder === 'true') return;
+        if (e.target.closest('button, a, input')) return;
+        if (e.button !== 0) return;
+
+        draggingId    = card.dataset.id;
+        draggingName2 = card.dataset.name || 'file';
+
+        let didStart = false;
+        const sx = e.clientX, sy = e.clientY;
+
+        let ghostEl2 = null;
+
+        function createGhost2() {
+            const g = document.createElement('div');
+            g.id = 'gridDragGhost';
+            g.textContent = '📄 ' + draggingName2;
+            Object.assign(g.style, {
+                position: 'fixed', zIndex: '10000',
+                background: '#eff6ff', border: '1.5px solid #93c5fd',
+                borderRadius: '8px', padding: '6px 14px',
+                fontSize: '13px', fontWeight: '600', color: '#1d4ed8',
+                pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                whiteSpace: 'nowrap'
+            });
+            document.body.appendChild(g);
+            return g;
+        }
+
+        function onMove(ev) {
+            const dx = Math.abs(ev.clientX - sx), dy = Math.abs(ev.clientY - sy);
+            if (!didStart && (dx > 6 || dy > 6)) {
+                didStart = true;
+                ghostEl2 = createGhost2();
+                if (card) card.style.opacity = '0.4';
+            }
+            if (ghostEl2) {
+                ghostEl2.style.left = (ev.clientX + 14) + 'px';
+                ghostEl2.style.top  = (ev.clientY - 14) + 'px';
+            }
+            // Highlight folder cards
+            document.querySelectorAll('[data-is-folder="true"]').forEach(c => {
+                const r = c.getBoundingClientRect();
+                const inside = ev.clientX >= r.left && ev.clientX <= r.right
+                            && ev.clientY >= r.top  && ev.clientY <= r.bottom;
+                c.style.outline = inside ? '2px solid #3b82f6' : '';
+                c.style.background = inside ? '#eff6ff' : '';
+            });
+        }
+
+        function onUp(ev) {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            if (card) card.style.opacity = '';
+            if (ghostEl2) ghostEl2.remove();
+            document.querySelectorAll('[data-is-folder="true"]').forEach(c => {
+                c.style.outline = '';
+                c.style.background = '';
+            });
+
+            if (!didStart || !draggingId) { draggingId = null; return; }
+
+            let targetFolder = null;
+            document.querySelectorAll('[data-is-folder="true"]').forEach(c => {
+                const r = c.getBoundingClientRect();
+                if (ev.clientX >= r.left && ev.clientX <= r.right
+                 && ev.clientY >= r.top  && ev.clientY <= r.bottom) {
+                    targetFolder = c;
+                }
+            });
+
+            if (targetFolder && targetFolder.dataset.path) {
+                const fp   = targetFolder.dataset.path;
+                const fn   = targetFolder.dataset.name;
+                const token = localStorage.getItem('token');
+                fetch('/api/files/' + draggingId + '/move', {
+                    method: 'PUT',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_path: fp })
+                }).then(r => r.json()).then(data => {
+                    if (data.folder_path !== undefined) {
+                        showToast(`✅ Đã di chuyển vào "${fn}"`);
+                        loadFiles();
+                    } else {
+                        showToast(`❌ ${data.message || 'Lỗi'}`, 'error');
+                    }
+                }).catch(() => showToast('❌ Lỗi kết nối', 'error'));
+            }
+
+            draggingId = null;
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
+
+
+// ── PHẦN 6: CSS bổ sung ───────────────────────────────────────────────────────
+(function injectCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Drop overlay upload */
+        #globalDropOverlay {
+            animation: dropOverlayFadeIn 0.15s ease;
+        }
+        @keyframes dropOverlayFadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        /* File row đang được drag */
+        tr.file-row.dragging {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Folder row được hover khi drag */
+        tr.file-row[data-is-folder="true"].drop-target {
+            background: #eff6ff !important;
+            outline: 2px solid #3b82f6 !important;
+        }
+
+        /* Project drop panel */
+        #projectDropPanel {
+            animation: panelSlideIn 0.18s ease;
+        }
+        @keyframes panelSlideIn {
+            from { opacity: 0; transform: translateY(-50%) translateX(12px); }
+            to   { opacity: 1; transform: translateY(-50%) translateX(0);    }
+        }
+
+        /* Tag pill cải tiến */
+        .tag-pill {
+            cursor: default;
+            transition: transform 0.12s;
+        }
+        .tag-pill:hover {
+            transform: scale(1.08);
+        }
+
+        /* Upload area visual cue */
+        #uploadArea:active {
+            transform: scale(0.97);
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+console.log('✅ File features patch loaded: drag-upload, drag-to-folder, drag-to-project, tag UX');
+
         lucide.createIcons();
         loadFiles();
         loadStorageInfo();

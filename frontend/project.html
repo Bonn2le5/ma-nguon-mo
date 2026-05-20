@@ -6,27 +6,31 @@
   <title>Projects - CloudStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-<style id="patch-styles">
-  /* Tag pill */
+<style>
+  /* ── Animations ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes slideInRight { from { transform:translateX(100%); } to { transform:translateX(0); } }
+  .spin { animation: spin 1s linear infinite; }
+  .fade-in { animation: fadeIn 0.18s ease forwards; }
+
+  /* ── Role badges ── */
+  .role-badge-owner  { background:#fef3c7; color:#92400e; }
+  .role-badge-editor { background:#dbeafe; color:#1e40af; }
+  .role-badge-viewer { background:#f3f4f6; color:#374151; }
+
+  /* ── Tag pill ── */
   .tag-pill {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 2px 8px; border-radius: 999px; font-size: 11px;
     font-weight: 600; line-height: 1.6; white-space: nowrap;
+    transition: transform 0.12s, box-shadow 0.12s;
   }
-  .tag-pill .tag-x {
-    cursor: pointer; opacity: .6; font-size: 10px;
-    margin-left: 2px; line-height: 1;
-  }
+  .tag-pill:hover { transform: scale(1.06); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  .tag-pill .tag-x { cursor: pointer; opacity: .6; font-size: 10px; margin-left: 2px; }
   .tag-pill .tag-x:hover { opacity: 1; }
- 
-  /* Favorite star */
-  .star-btn { background: none; border: none; cursor: pointer; padding: 3px; }
-  .star-btn .star-icon { transition: color .15s, transform .15s; }
-  .star-btn:hover .star-icon { transform: scale(1.2); }
-  .star-btn.active .star-icon { color: #f59e0b; }
-  .star-btn:not(.active) .star-icon { color: #d1d5db; }
- 
-  /* Upload progress bar */
+
+  /* ── Upload progress bar ── */
   #chunkProgressBar {
     height: 6px; border-radius: 3px; background: #dbeafe;
     overflow: hidden; margin-top: 6px;
@@ -35,14 +39,20 @@
     height: 100%; background: #2563eb;
     transition: width .2s ease; width: 0%;
   }
- 
-  /* Tag modal color swatches */
+
+  /* ── Tag color swatches ── */
   .swatch {
     width: 24px; height: 24px; border-radius: 50%;
     cursor: pointer; border: 2px solid transparent;
     transition: border-color .15s, transform .1s;
   }
-  .swatch.selected, .swatch:hover { border-color: #111; transform: scale(1.15); }
+  .swatch.selected, .swatch:hover {
+    border-color: #111; transform: scale(1.15);
+  }
+
+  /* ── Drop overlay ── */
+  #projectDropOverlay { animation: dropFadeIn 0.15s ease; }
+  @keyframes dropFadeIn { from { opacity:0; } to { opacity:1; } }
 </style>
 </head>
 
@@ -62,7 +72,6 @@
         </div>
       </div>
     </div>
-
     <nav class="flex-1 p-3 overflow-y-auto">
       <a href="/file.html" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 mb-1">
         <i data-lucide="folder" class="w-4 h-4"></i> Tất cả file
@@ -71,7 +80,6 @@
         <i data-lucide="layout-grid" class="w-4 h-4"></i> Projects
       </button>
     </nav>
-
     <div class="p-4 border-t border-gray-100">
       <button onclick="logout()" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
         <i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất
@@ -81,23 +89,18 @@
 
   <!-- ── MAIN ── -->
   <div class="flex-1 flex flex-col overflow-hidden">
-
     <!-- Top bar -->
     <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-2 text-sm">
         <i data-lucide="layout-grid" class="w-4 h-4 text-blue-600"></i>
         <span id="headerTitle" class="font-semibold text-gray-800">Projects</span>
       </div>
-      <button id="btnNewProject" onclick="openCreateModal()"
-        class="hidden flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-        <i data-lucide="plus" class="w-4 h-4"></i> Tạo project
-      </button>
     </header>
 
-    <!-- Content area — switches between list & detail -->
+    <!-- Content -->
     <main class="flex-1 overflow-y-auto p-6">
 
-      <!-- ══ PROJECT LIST VIEW ══ -->
+      <!-- ══ PROJECT LIST ══ -->
       <div id="viewList">
         <div class="flex items-center justify-between mb-5">
           <h1 class="text-xl font-bold text-gray-900">Tất cả Projects</h1>
@@ -106,27 +109,21 @@
             <i data-lucide="plus" class="w-4 h-4"></i> Tạo project
           </button>
         </div>
-
-        <!-- Loading -->
         <div id="listLoading" class="flex justify-center py-16">
           <i data-lucide="loader-2" class="w-6 h-6 text-blue-500 spin"></i>
         </div>
-
-        <!-- Empty -->
         <div id="listEmpty" class="hidden text-center py-20">
           <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <i data-lucide="layout-grid" class="w-8 h-8 text-blue-400"></i>
           </div>
           <p class="text-gray-500 text-sm">Chưa có project nào. Hãy tạo project đầu tiên!</p>
         </div>
-
-        <!-- Grid -->
         <div id="projectGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden"></div>
       </div>
 
-      <!-- ══ PROJECT DETAIL VIEW ══ -->
+      <!-- ══ PROJECT DETAIL ══ -->
       <div id="viewDetail" class="hidden">
-        <!-- Back button + title -->
+        <!-- Header -->
         <div class="flex items-center gap-3 mb-5">
           <button onclick="backToList()" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
             <i data-lucide="arrow-left" class="w-5 h-5"></i>
@@ -136,7 +133,6 @@
             <p id="detailDesc" class="text-sm text-gray-500 mt-0.5"></p>
           </div>
           <span id="detailMyRole" class="px-2.5 py-1 rounded-full text-xs font-semibold"></span>
-          <!-- Owner actions -->
           <div id="ownerActions" class="hidden flex gap-2">
             <button onclick="openEditModal()" class="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 text-gray-700">
               <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Sửa
@@ -161,21 +157,19 @@
 
         <!-- ── FILES TAB ── -->
         <div id="tabFiles">
-          <!-- Upload bar (editor + owner) -->
-          <div id="uploadBar" class="hidden mb-4">
-            <label class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cursor-pointer w-fit">
+          <div id="uploadBar" class="hidden mb-4 flex items-center gap-3 flex-wrap">
+            <label class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors">
               <i data-lucide="upload" class="w-4 h-4"></i> Tải lên file
               <input type="file" id="fileInput" class="hidden" multiple onchange="handleUpload(event)">
             </label>
+            <!-- Nút quản lý Tags được inject vào đây bởi injectTagManagerButton() -->
           </div>
 
-          <!-- Upload progress -->
           <div id="uploadProgress" class="hidden mb-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 flex items-center gap-3 text-sm text-blue-700">
             <i data-lucide="loader-2" class="w-4 h-4 spin"></i>
             <span id="uploadProgressText">Đang upload...</span>
           </div>
 
-          <!-- File list -->
           <div id="filesLoading" class="flex justify-center py-10">
             <i data-lucide="loader-2" class="w-5 h-5 text-blue-500 spin"></i>
           </div>
@@ -185,7 +179,6 @@
             </div>
             <p class="text-gray-400 text-sm">Chưa có file nào trong project</p>
           </div>
-
           <div class="bg-white rounded-xl border border-gray-100 overflow-hidden hidden" id="fileTable">
             <table class="w-full text-sm">
               <thead class="bg-gray-50 border-b border-gray-100">
@@ -204,7 +197,6 @@
 
         <!-- ── MEMBERS TAB ── -->
         <div id="tabMembers" class="hidden">
-          <!-- Add member form (owner only) -->
           <div id="addMemberForm" class="hidden mb-5 bg-white border border-gray-100 rounded-xl p-4">
             <h3 class="text-sm font-semibold text-gray-700 mb-3">Thêm thành viên</h3>
             <div class="flex gap-2 flex-wrap">
@@ -223,8 +215,6 @@
               </button>
             </div>
           </div>
-
-          <!-- Members list -->
           <div id="membersLoading" class="flex justify-center py-10">
             <i data-lucide="loader-2" class="w-5 h-5 text-blue-500 spin"></i>
           </div>
@@ -242,6 +232,7 @@
             </table>
           </div>
         </div>
+
       </div>
     </main>
   </div>
@@ -250,8 +241,8 @@
 <!-- ══════════ MODALS ══════════ -->
 
 <!-- Create Project -->
-<div id="modalCreate" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+<div id="modalCreate" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalCreate')">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
     <div class="flex items-center justify-between mb-5">
       <h3 class="text-lg font-bold text-gray-900">Tạo project mới</h3>
       <button onclick="closeModal('modalCreate')" class="p-1.5 hover:bg-gray-100 rounded-lg">
@@ -278,7 +269,7 @@
 </div>
 
 <!-- Edit Project -->
-<div id="modalEdit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div id="modalEdit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalEdit')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
     <div class="flex items-center justify-between mb-5">
       <h3 class="text-lg font-bold text-gray-900">Chỉnh sửa project</h3>
@@ -304,7 +295,7 @@
 </div>
 
 <!-- Delete Project -->
-<div id="modalDeleteProject" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div id="modalDeleteProject" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalDeleteProject')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
     <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
       <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
@@ -319,10 +310,11 @@
 </div>
 
 <!-- Rename File -->
-<div id="modalRename" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div id="modalRename" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalRename')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
     <h3 class="font-bold text-gray-900 mb-4">Đổi tên file</h3>
-    <input id="renameInput" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+    <input id="renameInput" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+      onkeydown="if(event.key==='Enter')confirmRename()">
     <div class="flex gap-3">
       <button onclick="closeModal('modalRename')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
       <button onclick="confirmRename()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Lưu</button>
@@ -331,7 +323,7 @@
 </div>
 
 <!-- Delete File -->
-<div id="modalDeleteFile" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div id="modalDeleteFile" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalDeleteFile')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
     <h3 class="font-bold text-gray-900 mb-2">Xóa file?</h3>
     <p class="text-sm text-gray-500 mb-5">File "<span id="deleteFileName" class="font-medium text-gray-700"></span>" sẽ bị xóa vĩnh viễn.</p>
@@ -343,7 +335,7 @@
 </div>
 
 <!-- Change Role -->
-<div id="modalChangeRole" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div id="modalChangeRole" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalChangeRole')">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
     <h3 class="font-bold text-gray-900 mb-1">Đổi quyền</h3>
     <p class="text-sm text-gray-500 mb-4">Thành viên: <span id="changeRoleUsername" class="font-medium text-gray-700"></span></p>
@@ -358,10 +350,58 @@
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2 max-w-xs"></div>
+<!-- ── Modal Quản lý Tags ── (FIX: modal này bị thiếu trong file gốc) -->
+<div id="modalProjectTags" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalProjectTags')">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <i data-lucide="tags" class="w-5 h-5 text-purple-500"></i> Quản lý Tags
+      </h3>
+      <button onclick="closeModal('modalProjectTags')" class="p-1.5 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+      </button>
+    </div>
+    <!-- Danh sách tag hiện có -->
+    <div id="tagList" class="mb-4 space-y-1 max-h-40 overflow-y-auto"></div>
+    <!-- Tạo tag mới -->
+    <div class="border-t border-gray-100 pt-4">
+      <p class="text-xs font-semibold text-gray-500 mb-2">TẠO TAG MỚI</p>
+      <div class="flex gap-2 mb-3">
+        <input id="newTagName" type="text" placeholder="Tên tag..."
+          class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+          onkeydown="if(event.key==='Enter')createProjectTag()">
+        <button onclick="createProjectTag()"
+          class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium">
+          Tạo
+        </button>
+      </div>
+      <!-- Màu sắc -->
+      <div id="tagColorSwatches" class="flex gap-2 flex-wrap"></div>
+    </div>
+  </div>
+</div>
 
-<!-- Preview Modal -->
+<!-- ── Modal Gán Tag cho File ── (FIX: modal này bị thiếu trong file gốc) -->
+<div id="modalAssignTag" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal('modalAssignTag')">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-900 flex items-center gap-2">
+        <i data-lucide="tag" class="w-4 h-4 text-purple-500"></i> Gán nhãn
+      </h3>
+      <button onclick="closeModal('modalAssignTag')" class="p-1.5 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+      </button>
+    </div>
+    <p class="text-xs text-gray-500 mb-3 truncate" id="assignTagFileName"></p>
+    <div id="assignTagList" class="space-y-1 max-h-48 overflow-y-auto mb-4"></div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('modalAssignTag')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Hủy</button>
+      <button onclick="confirmAssignTags()" class="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview -->
 <div id="modalPreview" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="closePreview()">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style="max-height:90vh" onclick="event.stopPropagation()">
     <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
@@ -379,6 +419,62 @@
   </div>
 </div>
 
+<!-- ══════════ FILE COMMENT DRAWER ══════════ -->
+<div id="commentDrawer" class="hidden fixed inset-0 z-50 flex justify-end" onclick="if(event.target===this)closeCommentDrawer()">
+  <!-- Overlay mờ -->
+  <div class="absolute inset-0 bg-black/30" onclick="closeCommentDrawer()"></div>
+  <!-- Panel -->
+  <div class="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl" style="animation:slideInRight .2s ease">
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100 flex-shrink-0">
+      <div id="drawerFileIcon" class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+        <i data-lucide="file" class="w-4 h-4 text-blue-500"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-gray-800 truncate" id="drawerFileName">Tên file</p>
+        <p class="text-xs text-gray-400" id="drawerCommentCount">0 bình luận</p>
+      </div>
+      <button onclick="closeCommentDrawer()" class="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Danh sách bình luận -->
+    <div id="drawerCommentsList" class="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+      <div id="drawerLoading" class="flex justify-center py-10">
+        <i data-lucide="loader-2" class="w-5 h-5 text-blue-500 spin"></i>
+      </div>
+      <div id="drawerEmpty" class="hidden text-center py-12">
+        <i data-lucide="message-circle" class="w-10 h-10 text-gray-300 mx-auto mb-2"></i>
+        <p class="text-gray-400 text-sm">Chưa có bình luận. Hãy là người đầu tiên!</p>
+      </div>
+      <div id="drawerComments"></div>
+    </div>
+
+    <!-- Input gửi -->
+    <div class="border-t border-gray-100 px-5 py-4 flex-shrink-0 bg-white">
+      <div class="flex gap-2 items-end">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mb-0.5" id="drawerAvatar">?</div>
+        <div class="flex-1 relative">
+          <textarea id="drawerInput" rows="1" placeholder="Viết bình luận... (Ctrl+Enter để gửi)"
+            class="w-full px-3 py-2.5 pr-10 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style="max-height:120px;overflow-y:auto;"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+            onkeydown="handleDrawerKeydown(event)"></textarea>
+          <button onclick="submitFileComment()"
+            class="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            title="Gửi (Ctrl+Enter)">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2 max-w-xs"></div>
+
 <script>
   // ── AUTH ──
   const token = localStorage.getItem('token');
@@ -394,7 +490,6 @@
     if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; }
     return res;
   }
-
   function logout() { localStorage.clear(); location.href = '/login.html'; }
 
   // ── TOAST ──
@@ -407,16 +502,21 @@
     clearTimeout(t._tid);
     t._tid = setTimeout(() => t.classList.add('hidden'), 3000);
   }
-
   function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-  function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+  function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
 
   // ── STATE ──
-  let currentProject = null; // full project object
-  let currentTab = 'files';
-  let renameFileId = null;
-  let deleteFileId = null;
-  let changeRoleMemberId = null;
+  let currentProject      = null;
+  let currentTab          = 'files';
+  let renameFileId        = null;
+  let deleteFileId        = null;
+  let changeRoleMemberId  = null;
+  // Tag state
+  let projectTags         = [];
+  let assignTagFileId     = null;
+  let assignTagSelected   = new Set();
+  let selectedTagColor    = '#6366f1';
+  const TAG_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#64748b'];
 
   // ══════════════════════════════════════════════
   // PROJECT LIST
@@ -428,18 +528,14 @@
 
     const res = await api('/api/projects');
     const projects = await res.json();
-
     document.getElementById('listLoading').classList.add('hidden');
 
-    if (!projects.length) {
-      document.getElementById('listEmpty').classList.remove('hidden');
-      return;
-    }
+    if (!projects.length) { document.getElementById('listEmpty').classList.remove('hidden'); return; }
 
     document.getElementById('projectGrid').classList.remove('hidden');
     document.getElementById('projectGrid').innerHTML = projects.map(p => {
       const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[p.my_role] || p.my_role;
-      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role];
+      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role] || '';
       return `
       <div onclick="openProject(${p.id})"
         class="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:border-blue-100 cursor-pointer transition-all fade-in group">
@@ -466,12 +562,10 @@
     openModal('modalCreate');
     setTimeout(() => document.getElementById('createName').focus(), 100);
   }
-
   async function createProject() {
     const name = document.getElementById('createName').value.trim();
     const description = document.getElementById('createDesc').value.trim();
     if (!name) return showToast('Tên project không được trống', 'error');
-
     const res = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name, description }) });
     const data = await res.json();
     if (!res.ok) return showToast(data.message, 'error');
@@ -489,41 +583,41 @@
     const p = await res.json();
     currentProject = p;
 
-    // Update UI
     document.getElementById('detailName').textContent = p.name;
     document.getElementById('detailDesc').textContent = p.description || '';
     document.getElementById('headerTitle').textContent = p.name;
 
     const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[p.my_role];
-    const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role];
+    const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[p.my_role] || '';
     const badge = document.getElementById('detailMyRole');
     badge.textContent = roleLabel;
     badge.className = `px-2.5 py-1 rounded-full text-xs font-semibold ${roleClass}`;
 
-    // Owner actions
     const ownerActions = document.getElementById('ownerActions');
     if (p.my_role === 'owner') ownerActions.classList.remove('hidden');
     else ownerActions.classList.add('hidden');
 
-    // Upload bar
     const uploadBar = document.getElementById('uploadBar');
     if (p.my_role !== 'viewer') uploadBar.classList.remove('hidden');
     else uploadBar.classList.add('hidden');
 
-    // Add member form
     const addMemberForm = document.getElementById('addMemberForm');
     if (p.my_role === 'owner') addMemberForm.classList.remove('hidden');
     else addMemberForm.classList.add('hidden');
 
-    // Switch view
     document.getElementById('viewList').classList.add('hidden');
     document.getElementById('viewDetail').classList.remove('hidden');
 
+    injectTagManagerButton(); // FIX: inject nút Tags vào toolbar
     switchTab('files');
   }
 
   function backToList() {
     currentProject = null;
+    // Reset nút Tags để có thể inject lại lần sau
+    const oldBtn = document.getElementById('btnOpenTagManager');
+    if (oldBtn) oldBtn.remove();
+
     document.getElementById('viewDetail').classList.add('hidden');
     document.getElementById('viewList').classList.remove('hidden');
     document.getElementById('headerTitle').textContent = 'Projects';
@@ -533,7 +627,7 @@
   function switchTab(tab) {
     currentTab = tab;
     ['files', 'members'].forEach(t => {
-      const btn = document.getElementById('tab-' + t);
+      const btn   = document.getElementById('tab-' + t);
       const panel = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
       if (t === tab) {
         btn.className = 'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white text-blue-600 shadow-sm';
@@ -544,10 +638,9 @@
       }
     });
     if (tab === 'files') loadFiles();
-    else loadMembers();
+    else if (tab === 'members') loadMembers();
   }
 
-  // ── Edit / Delete project ──
   function openEditModal() {
     document.getElementById('editName').value = currentProject.name;
     document.getElementById('editDesc').value = currentProject.description || '';
@@ -589,19 +682,30 @@
 
     const res = await api('/api/projects/' + currentProject.id + '/files');
     const files = await res.json();
-
     document.getElementById('filesLoading').classList.add('hidden');
+
     if (!files.length) { document.getElementById('filesEmpty').classList.remove('hidden'); return; }
 
     document.getElementById('fileTable').classList.remove('hidden');
     const canEdit = currentProject.my_role !== 'viewer';
 
-    document.getElementById('fileTableBody').innerHTML = files.map(f => `
+    document.getElementById('fileTableBody').innerHTML = files.map(f => {
+      // Render tag pills
+      const tagPills = f.tag_ids
+        ? f.tag_ids.split(',').map((tid, i) => {
+            const name  = (f.tag_names  || '').split(',')[i] || '';
+            const color = (f.tag_colors || '').split(',')[i] || '#6366f1';
+            return `<span class="tag-pill" style="background:${color}22;color:${color}">${escHtml(name)}</span>`;
+          }).join('')
+        : '';
+
+      return `
       <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors fade-in">
         <td class="px-4 py-3">
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2.5 flex-wrap">
             <i data-lucide="${getFileIcon(f.mime_type)}" class="w-4 h-4 ${getFileColor(f.mime_type)} shrink-0"></i>
             <span class="text-sm text-gray-800 font-medium truncate max-w-xs" title="${escHtml(f.original_name)}">${escHtml(f.original_name)}</span>
+            ${tagPills ? `<div class="flex gap-1 flex-wrap">${tagPills}</div>` : ''}
           </div>
         </td>
         <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">${formatSize(f.file_size)}</td>
@@ -609,85 +713,93 @@
         <td class="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">${formatDate(f.created_at)}</td>
         <td class="px-4 py-3">
           <div class="flex items-center justify-end gap-1">
+            <!-- Bình luận -->
+            <button onclick="openCommentDrawer(${f.id}, '${escAttr(f.original_name)}', '${f.mime_type||''}')"
+              class="p-1.5 rounded-lg hover:bg-blue-50 text-gray-500 hover:text-blue-600 relative" title="Bình luận">
+              <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+            </button>
+            <!-- Yêu thích -->
+            <button onclick="toggleFavorite(${f.id}, this)"
+              class="star-btn p-1.5 rounded-lg hover:bg-yellow-50 ${f.is_favorite ? 'active' : ''}" title="${f.is_favorite ? 'Bỏ yêu thích' : 'Yêu thích'}">
+              <i data-lucide="star" class="star-icon w-3.5 h-3.5" style="fill:${f.is_favorite ? 'currentColor' : 'none'};color:${f.is_favorite ? '#f59e0b' : '#d1d5db'}"></i>
+            </button>
+            <!-- Xem trước -->
             <button onclick="openPreview(${f.id}, '${escAttr(f.original_name)}', '${f.mime_type||''}', ${f.file_size||0})"
               class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-purple-600" title="Xem trước">
               <i data-lucide="eye" class="w-3.5 h-3.5"></i>
             </button>
+            <!-- Tải về -->
             <a href="/api/projects/${currentProject.id}/files/${f.id}/download"
               class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600" title="Tải về">
               <i data-lucide="download" class="w-3.5 h-3.5"></i>
             </a>
             ${canEdit ? `
+            <!-- Gán tag -->
+            <button onclick="openAssignTagModal(${f.id}, '${escAttr(f.original_name)}', '${f.tag_ids||''}')"
+              class="p-1.5 rounded-lg hover:bg-purple-50 text-gray-500 hover:text-purple-600" title="Gán nhãn">
+              <i data-lucide="tag" class="w-3.5 h-3.5"></i>
+            </button>
+            <!-- Đổi tên -->
             <button onclick="openRenameModal(${f.id}, '${escAttr(f.original_name)}')"
               class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-yellow-600" title="Đổi tên">
               <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
             </button>
+            <!-- Xóa -->
             <button onclick="openDeleteFileModal(${f.id}, '${escAttr(f.original_name)}')"
               class="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600" title="Xóa">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>` : ''}
           </div>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     lucide.createIcons();
   }
 
- <script id="patch-handleUpload">
-  const CHUNK_SIZE   = 8 * 1024 * 1024;  // 8MB mỗi chunk
-  const NORMAL_LIMIT = 100 * 1024 * 1024; // dưới 100MB dùng upload thường
- 
+  // ══════════════════════════════════════════════
+  // UPLOAD
+  // ══════════════════════════════════════════════
+  const CHUNK_SIZE   = 8  * 1024 * 1024;  // 8MB mỗi chunk
+  const NORMAL_LIMIT = 100 * 1024 * 1024; // ≤100MB dùng upload thường
+
   async function handleUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
- 
     const progress     = document.getElementById('uploadProgress');
     const progressText = document.getElementById('uploadProgressText');
     progress.classList.remove('hidden');
- 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       progressText.textContent = `(${i + 1}/${files.length}) ${file.name}`;
- 
       try {
-        if (file.size <= NORMAL_LIMIT) {
-          await uploadNormal(file);
-        } else {
-          await uploadChunked(file, progressText);
-        }
+        if (file.size <= NORMAL_LIMIT) await uploadNormal(file);
+        else await uploadChunked(file, progressText);
       } catch (err) {
         showToast('Lỗi upload: ' + file.name, 'error');
       }
     }
- 
-    // Ẩn thanh progress bar chunk nếu còn
     const bar = document.getElementById('chunkProgressBar');
     if (bar) bar.style.display = 'none';
- 
     progress.classList.add('hidden');
     e.target.value = '';
     showToast('Upload thành công');
     loadFiles();
   }
- 
-  // ── Upload thường (≤ 100MB) ────────────────────────────────────────────
+
   async function uploadNormal(file) {
     const fd = new FormData();
     fd.append('file', file);
-    const res  = await fetch(`/api/projects/${currentProject.id}/files/upload`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: fd
+    const res = await fetch(`/api/projects/${currentProject.id}/files/upload`, {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
   }
- 
-  // ── Chunked upload (> 100MB) ───────────────────────────────────────────
+
   async function uploadChunked(file, progressText) {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    const base        = `/api/projects/${currentProject.id}/files/upload`;
- 
-    // Hiện progress bar
+    const base = `/api/projects/${currentProject.id}/files/upload`;
+
     let bar = document.getElementById('chunkProgressBar');
     if (!bar) {
       bar = document.createElement('div');
@@ -697,45 +809,32 @@
     }
     bar.style.display = 'block';
     const fill = document.getElementById('chunkProgressFill');
- 
-    // 1. Init session
+
     const initRes = await fetch(`${base}/chunk-init`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        originalName: file.name,
-        totalSize:    file.size,
-        mimeType:     file.type || 'application/octet-stream',
-        totalChunks
-      })
+      body: JSON.stringify({ originalName: file.name, totalSize: file.size, mimeType: file.type || 'application/octet-stream', totalChunks })
     });
-    const { uploadId } = await initRes.json();
-    if (!initRes.ok) throw new Error('Không thể khởi tạo upload');
- 
-    // 2. Gửi từng chunk
+    const initData = await initRes.json();
+    if (!initRes.ok) throw new Error(initData.message || 'Không thể khởi tạo upload');
+    const { uploadId } = initData;
+
     for (let idx = 0; idx < totalChunks; idx++) {
-      const start = idx * CHUNK_SIZE;
-      const blob  = file.slice(start, start + CHUNK_SIZE);
- 
+      const blob = file.slice(idx * CHUNK_SIZE, (idx + 1) * CHUNK_SIZE);
       const fd = new FormData();
-      fd.append('uploadId',    uploadId);
-      fd.append('chunkIndex',  idx);
+      fd.append('uploadId', uploadId);
+      fd.append('chunkIndex', idx);
       fd.append('totalChunks', totalChunks);
-      fd.append('chunk',       blob, file.name);
- 
+      fd.append('chunk', blob, file.name);
       const chunkRes = await fetch(`${base}/chunk`, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token },
-        body: fd
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd
       });
       if (!chunkRes.ok) throw new Error(`Lỗi chunk ${idx}`);
- 
       const pct = Math.round(((idx + 1) / totalChunks) * 100);
       fill.style.width = pct + '%';
-      progressText.textContent = `${file.name} — ${pct}% (${idx + 1}/${totalChunks} chunks)`;
+      if (progressText) progressText.textContent = `${file.name} — ${pct}% (${idx + 1}/${totalChunks} chunks)`;
     }
- 
-    // 3. Finalize
+
     const finalRes = await fetch(`${base}/chunk-finalize`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -747,85 +846,79 @@
     }
     fill.style.width = '100%';
   }
-script id="patch-new-functions">
-  // ── STATE ──────────────────────────────────────────────────────────────
-  let projectTags       = [];   // cache tags của project hiện tại
-  let assignTagFileId   = null; // file đang được gán tag
-  let assignTagSelected = new Set(); // tag ids đang chọn
-  let selectedTagColor  = '#6366f1'; // màu đang chọn khi tạo tag
- 
-  const TAG_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#64748b'];
- 
-  // ── FAVORITE ──────────────────────────────────────────────────────────
-  async function toggleFavorite(fileId, btn) {
-    const res  = await api(`/api/projects/${currentProject.id}/files/${fileId}/favorite`, { method: 'PUT' });
-    const data = await res.json();
-    if (!res.ok) return showToast(data.message, 'error');
- 
-    const isFav = !!data.is_favorite;
-    btn.classList.toggle('active', isFav);
-    const svg = btn.querySelector('.star-icon');
-    svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
-    btn.title = isFav ? 'Bỏ yêu thích' : 'Yêu thích';
-    showToast(isFav ? '⭐ Đã thêm vào yêu thích' : 'Đã bỏ yêu thích');
-  }
- 
-  // ── LOAD TAGS ─────────────────────────────────────────────────────────
+
+  // ══════════════════════════════════════════════
+  // TAGS
+  // ══════════════════════════════════════════════
   async function loadProjectTags() {
-    const res  = await api(`/api/projects/${currentProject.id}/tags`);
+    const res = await api(`/api/projects/${currentProject.id}/tags`);
     projectTags = await res.json();
     return projectTags;
   }
- 
-  // ── MỞ MODAL QUẢN LÝ TAGS ─────────────────────────────────────────────
+
+  // Inject nút "Tags" vào upload bar
+  function injectTagManagerButton() {
+    if (document.getElementById('btnOpenTagManager')) return;
+    const uploadBar = document.getElementById('uploadBar');
+    if (!uploadBar || currentProject.my_role === 'viewer') return;
+    const btn = document.createElement('button');
+    btn.id = 'btnOpenTagManager';
+    btn.onclick = openTagManagerModal;
+    btn.title = 'Quản lý Tags';
+    btn.className = 'inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors';
+    btn.innerHTML = '<i data-lucide="tags" class="w-4 h-4"></i><span class="hidden sm:inline">Tags</span>';
+    uploadBar.appendChild(btn);
+    lucide.createIcons();
+  }
+
+  // Mở modal quản lý tags
   async function openTagManagerModal() {
     await loadProjectTags();
     renderTagManagerList();
     renderTagColorSwatches();
+    document.getElementById('newTagName').value = '';
     openModal('modalProjectTags');
+    setTimeout(() => document.getElementById('newTagName').focus(), 100);
   }
- 
+
   function renderTagColorSwatches() {
     document.getElementById('tagColorSwatches').innerHTML = TAG_COLORS.map(c =>
       `<span class="swatch ${c === selectedTagColor ? 'selected' : ''}"
         style="background:${c}" onclick="selectTagColor('${c}', this)" title="${c}"></span>`
     ).join('');
   }
- 
+
   function selectTagColor(color, el) {
     selectedTagColor = color;
     document.querySelectorAll('#tagColorSwatches .swatch').forEach(s => s.classList.remove('selected'));
     el.classList.add('selected');
   }
- 
+
   function renderTagManagerList() {
     const canEdit = currentProject.my_role !== 'viewer';
     document.getElementById('tagList').innerHTML = projectTags.length
       ? projectTags.map(t => `
           <div class="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
             <span class="tag-pill" style="background:${t.color}22;color:${t.color}">${escHtml(t.name)}</span>
-            ${canEdit ? `<button onclick="deleteProjectTag(${t.id})" class="text-gray-300 hover:text-red-500 text-xs" title="Xóa">✕</button>` : ''}
+            ${canEdit ? `<button onclick="deleteProjectTag(${t.id})" class="text-gray-300 hover:text-red-500 text-xs ml-2" title="Xóa">✕</button>` : ''}
           </div>`).join('')
       : '<p class="text-sm text-gray-400 text-center py-2">Chưa có tag nào</p>';
   }
- 
+
   async function createProjectTag() {
     const name = document.getElementById('newTagName').value.trim();
     if (!name) return showToast('Nhập tên tag', 'error');
- 
     const res  = await api(`/api/projects/${currentProject.id}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ name, color: selectedTagColor })
+      method: 'POST', body: JSON.stringify({ name, color: selectedTagColor })
     });
     const data = await res.json();
     if (!res.ok) return showToast(data.message, 'error');
- 
     document.getElementById('newTagName').value = '';
     projectTags.push(data);
     renderTagManagerList();
-    showToast('Đã tạo tag ' + name);
+    showToast('Đã tạo tag: ' + name);
   }
- 
+
   async function deleteProjectTag(tagId) {
     const res = await api(`/api/projects/${currentProject.id}/tags/${tagId}`, { method: 'DELETE' });
     if (!res.ok) return showToast('Lỗi xóa tag', 'error');
@@ -833,20 +926,19 @@ script id="patch-new-functions">
     renderTagManagerList();
     showToast('Đã xóa tag');
   }
- 
-  // ── MỞ MODAL GÁN TAG CHO FILE ─────────────────────────────────────────
+
+  // Mở modal gán tag cho file
   async function openAssignTagModal(fileId, fileName, currentTagIds) {
     assignTagFileId = fileId;
     assignTagSelected = new Set(
       currentTagIds ? currentTagIds.split(',').map(Number).filter(Boolean) : []
     );
     document.getElementById('assignTagFileName').textContent = fileName;
- 
     await loadProjectTags();
     renderAssignTagList();
     openModal('modalAssignTag');
   }
- 
+
   function renderAssignTagList() {
     document.getElementById('assignTagList').innerHTML = projectTags.length
       ? projectTags.map(t => `
@@ -859,16 +951,15 @@ script id="patch-new-functions">
       : `<p class="text-sm text-gray-400 text-center py-4">Chưa có tag nào.<br>
           <button onclick="closeModal('modalAssignTag');openTagManagerModal()" class="text-blue-600 underline text-xs mt-1">Tạo tag mới</button></p>`;
   }
- 
+
   function toggleAssignTag(tagId, checked) {
     if (checked) assignTagSelected.add(tagId);
     else         assignTagSelected.delete(tagId);
   }
- 
+
   async function confirmAssignTags() {
     const res = await api(`/api/projects/${currentProject.id}/files/${assignTagFileId}/tags`, {
-      method: 'PUT',
-      body: JSON.stringify({ tag_ids: [...assignTagSelected] })
+      method: 'PUT', body: JSON.stringify({ tag_ids: [...assignTagSelected] })
     });
     const data = await res.json();
     if (!res.ok) return showToast(data.message, 'error');
@@ -876,30 +967,26 @@ script id="patch-new-functions">
     showToast('Đã cập nhật tag');
     loadFiles();
   }
- 
-  // ── NÚT MỞ MODAL TAG MANAGER — thêm vào toolbar hiện có ──────────────
-  // Gọi hàm này sau khi loadProject() để inject nút vào toolbar nếu chưa có
-  function injectTagManagerButton() {
-    if (document.getElementById('btnOpenTagManager')) return; // tránh inject 2 lần
-    const uploadBar = document.getElementById('uploadBar');
-    if (!uploadBar || currentProject.my_role === 'viewer') return;
- 
-    const btn = document.createElement('button');
-    btn.id = 'btnOpenTagManager';
-    btn.onclick = openTagManagerModal;
-    btn.title = 'Quản lý Tags';
-    btn.className = 'inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors';
-    btn.innerHTML = `<i data-lucide="tags" class="w-4 h-4"></i><span class="hidden sm:inline">Tags</span>`;
-    uploadBar.appendChild(btn);
-    lucide.createIcons();
+
+  // Toggle yêu thích
+  async function toggleFavorite(fileId, btn) {
+    const res  = await api(`/api/projects/${currentProject.id}/files/${fileId}/favorite`, { method: 'PUT' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.message, 'error');
+    const isFav = !!data.is_favorite;
+    btn.classList.toggle('active', isFav);
+    const icon = btn.querySelector('.star-icon');
+    if (icon) {
+      icon.setAttribute('fill', isFav ? 'currentColor' : 'none');
+      icon.style.color = isFav ? '#f59e0b' : '#d1d5db';
+    }
+    btn.title = isFav ? 'Bỏ yêu thích' : 'Yêu thích';
+    showToast(isFav ? '⭐ Đã thêm vào yêu thích' : 'Đã bỏ yêu thích');
   }
- 
-  // Hook vào sau khi project được load — tìm chỗ gọi loadProject() và thêm:
-  //   injectTagManagerButton();
-  // Hoặc nếu dùng DOMContentLoaded / selectProject(), thêm dòng đó vào cuối hàm đó.
-</script>
 
-
+  // ══════════════════════════════════════════════
+  // FILE ACTIONS
+  // ══════════════════════════════════════════════
   function openRenameModal(fileId, currentName) {
     renameFileId = fileId;
     document.getElementById('renameInput').value = currentName;
@@ -939,16 +1026,14 @@ script id="patch-new-functions">
   async function loadMembers() {
     document.getElementById('membersLoading').classList.remove('hidden');
     document.getElementById('memberTable').classList.add('hidden');
-
     const res = await api('/api/projects/' + currentProject.id + '/members');
     const members = await res.json();
     document.getElementById('membersLoading').classList.add('hidden');
     document.getElementById('memberTable').classList.remove('hidden');
-
     const isOwner = currentProject.my_role === 'owner';
     document.getElementById('memberTableBody').innerHTML = members.map(m => {
       const roleLabel = { owner: 'Chủ sở hữu', editor: 'Chỉnh sửa', viewer: 'Chỉ xem' }[m.role];
-      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[m.role];
+      const roleClass = { owner: 'role-badge-owner', editor: 'role-badge-editor', viewer: 'role-badge-viewer' }[m.role] || '';
       const actions = (isOwner && m.role !== 'owner') ? `
         <button onclick="openChangeRoleModal(${m.id}, '${escAttr(m.username)}', '${m.role}')"
           class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600" title="Đổi quyền">
@@ -985,7 +1070,6 @@ script id="patch-new-functions">
     const username = document.getElementById('newMemberUsername').value.trim();
     const role = document.getElementById('newMemberRole').value;
     if (!username) return showToast('Nhập tên đăng nhập', 'error');
-
     const res = await api('/api/projects/' + currentProject.id + '/members', {
       method: 'POST', body: JSON.stringify({ username, role })
     });
@@ -1013,7 +1097,6 @@ script id="patch-new-functions">
     showToast('Đã cập nhật quyền');
     loadMembers();
   }
-
   async function removeMember(memberId, username) {
     if (!confirm(`Xóa ${username} khỏi project?`)) return;
     const res = await api(`/api/projects/${currentProject.id}/members/${memberId}`, { method: 'DELETE' });
@@ -1024,7 +1107,7 @@ script id="patch-new-functions">
   }
 
   // ══════════════════════════════════════════════
-  // PREVIEW FILE
+  // PREVIEW
   // ══════════════════════════════════════════════
   async function openPreview(fileId, name, mime, size) {
     document.getElementById('previewName').textContent = name;
@@ -1032,31 +1115,34 @@ script id="patch-new-functions">
     const dl = document.getElementById('previewDownload');
     dl.href = `/api/projects/${currentProject.id}/files/${fileId}/download`;
     dl.download = name;
-    const iconMap = { image:'image', video:'film', audio:'music', pdf:'file-text' };
-    const cat = getPreviewCat(mime);
-    document.getElementById('previewIcon').setAttribute('data-lucide', iconMap[cat] || getFileIcon(mime));
-    lucide.createIcons();
+    openModal('modalPreview');
     const body = document.getElementById('previewBody');
     body.innerHTML = '<div class="text-gray-400 text-sm flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 spin"></i> Đang tải...</div>';
     lucide.createIcons();
-    openModal('modalPreview');
+
     const url = `/api/projects/${currentProject.id}/files/${fileId}/download`;
+    const cat = getPreviewCat(mime);
     try {
       if (cat === 'image') {
-        const blob = await fetchProjectBlob(url);
-        body.innerHTML = `<img src="${blob}" alt="${name}" class="max-w-full max-h-full object-contain rounded-lg shadow" style="max-height:calc(90vh - 80px)">`;
+        const blob = await fetchBlob(url);
+        body.innerHTML = `<img src="${blob}" alt="${escHtml(name)}" class="max-w-full max-h-full object-contain rounded-lg" style="max-height:calc(90vh - 80px)">`;
       } else if (cat === 'video') {
-        const blob = await fetchProjectBlob(url);
-        body.innerHTML = `<video controls class="max-w-full rounded-lg shadow" style="max-height:calc(90vh - 80px)"><source src="${blob}" type="${mime}"></video>`;
+        const blob = await fetchBlob(url);
+        body.innerHTML = `<video controls class="max-w-full rounded-lg" style="max-height:calc(90vh - 80px)"><source src="${blob}" type="${mime}"></video>`;
       } else if (cat === 'audio') {
-        const blob = await fetchProjectBlob(url);
-        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-8 w-full max-w-sm"><div class="w-20 h-20 rounded-2xl bg-pink-50 flex items-center justify-center"><i data-lucide="music" class="w-10 h-10 text-pink-400"></i></div><p class="text-sm text-gray-600 font-medium text-center">${name}</p><audio controls class="w-full"><source src="${blob}" type="${mime}"></audio></div>`;
+        const blob = await fetchBlob(url);
+        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-8 w-full max-w-sm"><div class="w-20 h-20 rounded-2xl bg-pink-50 flex items-center justify-center"><i data-lucide="music" class="w-10 h-10 text-pink-400"></i></div><p class="text-sm text-gray-600 font-medium">${escHtml(name)}</p><audio controls class="w-full"><source src="${blob}" type="${mime}"></audio></div>`;
         lucide.createIcons();
       } else if (cat === 'pdf') {
-        const blob = await fetchProjectBlob(url);
-        body.innerHTML = `<iframe src="${blob}" class="w-full rounded-lg border-0" style="height:calc(90vh - 80px)"></iframe>`;
+        const blob = await fetchBlob(url);
+        body.innerHTML = `<iframe src="${blob}" class="w-full border-0 rounded-lg" style="height:calc(90vh - 80px)"></iframe>`;
       } else {
-        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-10"><div class="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center"><i data-lucide="${getFileIcon(mime)}" class="w-10 h-10 text-gray-400"></i></div><div class="text-center"><p class="text-gray-700 font-semibold text-sm mb-1">${name}</p><p class="text-gray-400 text-xs">${size > 0 ? formatSize(Number(size)) : ''} ${mime ? '· '+mime : ''}</p></div><p class="text-gray-400 text-xs">Không thể xem trước loại file này</p><a href="${url}" download="${name}" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><i data-lucide=\"download\" class=\"w-4 h-4\"></i> Tải về để mở</a></div>`;
+        body.innerHTML = `<div class="flex flex-col items-center gap-4 py-10">
+          <div class="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center"><i data-lucide="${getFileIcon(mime)}" class="w-10 h-10 text-gray-400"></i></div>
+          <p class="text-gray-500 text-sm">Không thể xem trước loại file này</p>
+          <a href="${url}" download="${escHtml(name)}" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+            <i data-lucide="download" class="w-4 h-4"></i> Tải về để mở
+          </a></div>`;
         lucide.createIcons();
       }
     } catch(err) {
@@ -1066,8 +1152,7 @@ script id="patch-new-functions">
 
   function closePreview() {
     const body = document.getElementById('previewBody');
-    if (!body) return;
-    body.querySelectorAll('img, video source, audio source, iframe').forEach(el => {
+    body.querySelectorAll('img, video, audio, iframe').forEach(el => {
       const src = el.src || el.getAttribute('src') || '';
       if (src.startsWith('blob:')) URL.revokeObjectURL(src);
     });
@@ -1075,7 +1160,7 @@ script id="patch-new-functions">
     closeModal('modalPreview');
   }
 
-  async function fetchProjectBlob(url) {
+  async function fetchBlob(url) {
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
     if (!res.ok) throw new Error('fetch failed');
     return URL.createObjectURL(await res.blob());
@@ -1093,9 +1178,7 @@ script id="patch-new-functions">
   // ══════════════════════════════════════════════
   // AUTOCOMPLETE USERNAME
   // ══════════════════════════════════════════════
-  let acResults = [];
-  let acIndex = -1;
-  let acTimer = null;
+  let acResults = [], acIndex = -1, acTimer = null;
 
   async function searchUsers(q) {
     const dd = document.getElementById('userDropdown');
@@ -1115,35 +1198,28 @@ script id="patch-new-functions">
   }
 
   function renderDropdown() {
-    const dd = document.getElementById('userDropdown');
+    const dd  = document.getElementById('userDropdown');
+    const inp = document.getElementById('newMemberUsername');
+    const rect = inp.getBoundingClientRect();
+    dd.style.top   = (rect.bottom + 4) + 'px';
+    dd.style.left  = rect.left + 'px';
+    dd.style.width = rect.width + 'px';
+
     if (!acResults.length) {
-      // Hiện thông báo không tìm thấy
-      const inp = document.getElementById('newMemberUsername');
-      const rect = inp.getBoundingClientRect();
-      dd.style.top = (rect.bottom + 4) + 'px';
-      dd.style.left = rect.left + 'px';
-      dd.style.width = rect.width + 'px';
       dd.innerHTML = '<div class="px-4 py-3 text-sm text-gray-400 text-center">Không tìm thấy người dùng</div>';
       dd.classList.remove('hidden');
       return;
     }
-    // Tính toán vị trí dựa vào input
-    const inp = document.getElementById('newMemberUsername');
-    const rect = inp.getBoundingClientRect();
-    dd.style.top = (rect.bottom + 4) + 'px';
-    dd.style.left = rect.left + 'px';
-    dd.style.width = rect.width + 'px';
     dd.classList.remove('hidden');
     dd.innerHTML = acResults.map((u, i) => `
-      <div onclick="pickUser('${u.username.replace(/\'/g, "&apos;")}')"
-        id="ac-item-${i}"
+      <div onclick="pickUser('${u.username.replace(/'/g, "&#39;")}')" id="ac-item-${i}"
         class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors">
         <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
           ${u.username.charAt(0).toUpperCase()}
         </div>
         <div>
-          <p class="text-sm font-medium text-gray-800">${u.username}</p>
-          <p class="text-xs text-gray-400">${u.email}</p>
+          <p class="text-sm font-medium text-gray-800">${escHtml(u.username)}</p>
+          <p class="text-xs text-gray-400">${escHtml(u.email)}</p>
         </div>
       </div>`).join('');
   }
@@ -1158,22 +1234,11 @@ script id="patch-new-functions">
   function handleUserKeydown(e) {
     const dd = document.getElementById('userDropdown');
     if (dd.classList.contains('hidden')) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      acIndex = Math.min(acIndex + 1, acResults.length - 1);
-      highlightAc();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      acIndex = Math.max(acIndex - 1, -1);
-      highlightAc();
-    } else if (e.key === 'Enter' && acIndex >= 0) {
-      e.preventDefault();
-      pickUser(acResults[acIndex].username);
-    } else if (e.key === 'Escape') {
-      dd.classList.add('hidden');
-    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acResults.length - 1); highlightAc(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); highlightAc(); }
+    else if (e.key === 'Enter' && acIndex >= 0) { e.preventDefault(); pickUser(acResults[acIndex].username); }
+    else if (e.key === 'Escape') { dd.classList.add('hidden'); }
   }
-
   function highlightAc() {
     acResults.forEach((_, i) => {
       const el = document.getElementById('ac-item-' + i);
@@ -1182,15 +1247,12 @@ script id="patch-new-functions">
         : 'flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors';
     });
   }
-
   document.addEventListener('click', e => {
     if (!e.target.closest('#newMemberUsername') && !e.target.closest('#userDropdown')) {
       const dd = document.getElementById('userDropdown');
       if (dd) dd.classList.add('hidden');
     }
   });
-
-  // Ẩn dropdown khi scroll
   document.querySelector('main').addEventListener('scroll', () => {
     const dd = document.getElementById('userDropdown');
     if (dd) dd.classList.add('hidden');
@@ -1199,9 +1261,8 @@ script id="patch-new-functions">
   // ══════════════════════════════════════════════
   // HELPERS
   // ══════════════════════════════════════════════
-  function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function escAttr(s) { return String(s || '').replace(/'/g, "\\'"); }
-
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(s) { return String(s||'').replace(/'/g,"\\'"); }
   function formatSize(bytes) {
     if (!bytes) return '—';
     if (bytes < 1024) return bytes + ' B';
@@ -1209,51 +1270,277 @@ script id="patch-new-functions">
     if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
     return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
   }
-
   function formatDate(d) {
     if (!d) return '—';
-    const dt = new Date(d);
-    return dt.toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' });
+    return new Date(d).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' });
   }
-
   function getFileIcon(mime) {
     if (!mime) return 'file';
     if (mime.startsWith('image/')) return 'image';
     if (mime.startsWith('video/')) return 'film';
     if (mime.startsWith('audio/')) return 'music';
     if (mime.includes('pdf')) return 'file-text';
-    if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return 'archive';
-    if (mime.includes('word') || mime.includes('document')) return 'file-text';
-    if (mime.includes('sheet') || mime.includes('excel')) return 'table';
-    if (mime.includes('presentation') || mime.includes('powerpoint')) return 'presentation';
+    if (mime.includes('zip')||mime.includes('rar')||mime.includes('7z')) return 'archive';
+    if (mime.includes('word')||mime.includes('document')) return 'file-text';
+    if (mime.includes('sheet')||mime.includes('excel')) return 'table';
+    if (mime.includes('presentation')||mime.includes('powerpoint')) return 'presentation';
     if (mime.includes('text/')) return 'file-code';
     return 'file';
   }
-
   function getFileColor(mime) {
     if (!mime) return 'text-gray-400';
     if (mime.startsWith('image/')) return 'text-purple-500';
     if (mime.startsWith('video/')) return 'text-pink-500';
     if (mime.startsWith('audio/')) return 'text-yellow-500';
     if (mime.includes('pdf')) return 'text-red-500';
-    if (mime.includes('zip') || mime.includes('rar')) return 'text-orange-500';
-    if (mime.includes('word') || mime.includes('document')) return 'text-blue-500';
-    if (mime.includes('sheet') || mime.includes('excel')) return 'text-green-500';
+    if (mime.includes('zip')||mime.includes('rar')) return 'text-orange-500';
+    if (mime.includes('word')||mime.includes('document')) return 'text-blue-500';
+    if (mime.includes('sheet')||mime.includes('excel')) return 'text-green-500';
     return 'text-gray-400';
   }
 
-  // Keyboard shortcuts
+  // ══════════════════════════════════════════════
+  // KEYBOARD SHORTCUTS
+  // ══════════════════════════════════════════════
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      ['modalCreate','modalEdit','modalDeleteProject','modalRename','modalDeleteFile','modalChangeRole']
-        .forEach(id => closeModal(id));
+      ['modalCreate','modalEdit','modalDeleteProject','modalRename','modalDeleteFile',
+       'modalChangeRole','modalProjectTags','modalAssignTag'].forEach(id => closeModal(id));
       closePreview();
     }
   });
 
+  // ══════════════════════════════════════════════
+  // DRAG & DROP UPLOAD
+  // ══════════════════════════════════════════════
+  (function setupDropUpload() {
+    function canUpload() {
+      const bar = document.getElementById('uploadBar');
+      return bar && !bar.classList.contains('hidden');
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'projectDropOverlay';
+    overlay.innerHTML = `
+      <div style="text-align:center">
+        <div style="font-size:56px;margin-bottom:12px">📂</div>
+        <p style="font-size:18px;font-weight:700;color:#2563eb;margin-bottom:4px">Thả file để tải lên project</p>
+        <p id="dropOverlayProjectName" style="font-size:13px;color:#6b7280"></p>
+      </div>`;
+    Object.assign(overlay.style, {
+      position:'fixed', inset:'0', zIndex:'9999',
+      background:'rgba(59,130,246,0.10)', backdropFilter:'blur(2px)',
+      border:'3px dashed #3b82f6', display:'none',
+      alignItems:'center', justifyContent:'center', pointerEvents:'none'
+    });
+    document.body.appendChild(overlay);
+
+    let counter = 0;
+    document.addEventListener('dragenter', e => {
+      if (!e.dataTransfer.types.includes('Files') || !canUpload()) return;
+      counter++;
+      const nameEl = overlay.querySelector('#dropOverlayProjectName');
+      if (nameEl) nameEl.textContent = currentProject ? `Vào project: ${currentProject.name}` : '';
+      overlay.style.display = 'flex';
+      overlay.style.pointerEvents = 'all';
+    });
+    document.addEventListener('dragleave', e => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      counter--;
+      if (counter <= 0) { counter = 0; overlay.style.display = 'none'; overlay.style.pointerEvents = 'none'; }
+    });
+    document.addEventListener('dragover', e => {
+      if (e.dataTransfer.types.includes('Files') && canUpload()) e.preventDefault();
+    });
+    document.addEventListener('drop', async e => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      counter = 0;
+      overlay.style.display = 'none';
+      overlay.style.pointerEvents = 'none';
+      if (!canUpload()) { showToast('Bạn không có quyền upload', 'error'); return; }
+
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length) return;
+
+      const progress = document.getElementById('uploadProgress');
+      const progressText = document.getElementById('uploadProgressText');
+      if (progress) progress.classList.remove('hidden');
+      let ok = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (progressText) progressText.textContent = `(${i+1}/${files.length}) ${file.name}`;
+        try {
+          if (file.size <= NORMAL_LIMIT) await uploadNormal(file);
+          else await uploadChunked(file, progressText);
+          ok++;
+          showToast(`✅ ${file.name} đã upload`);
+        } catch(err) {
+          showToast(`❌ ${file.name}: ${err.message||''}`, 'error');
+        }
+      }
+      const bar = document.getElementById('chunkProgressBar');
+      if (bar) bar.style.display = 'none';
+      if (progress) progress.classList.add('hidden');
+      if (ok > 0) loadFiles();
+    });
+  })();
+
   // ── INIT ──
   loadProjects();
   lucide.createIcons();
+
+  // ══════════════════════════════════════════════
+  // FILE COMMENT DRAWER
+  // ══════════════════════════════════════════════
+  let drawerFileId   = null;
+  let drawerFileName = '';
+
+  const COMMENT_COLORS = [
+    'from-blue-500 to-indigo-600',
+    'from-green-500 to-teal-600',
+    'from-purple-500 to-pink-600',
+    'from-orange-500 to-red-500',
+    'from-cyan-500 to-blue-500'
+  ];
+  function avatarColor(name) {
+    return COMMENT_COLORS[(name || '').charCodeAt(0) % COMMENT_COLORS.length];
+  }
+
+  function openCommentDrawer(fileId, fileName, mimeType) {
+    drawerFileId   = fileId;
+    drawerFileName = fileName;
+
+    document.getElementById('drawerFileName').textContent = fileName;
+    document.getElementById('drawerCommentCount').textContent = 'Đang tải...';
+
+    // Avatar người dùng hiện tại
+    const av = document.getElementById('drawerAvatar');
+    if (av && username) {
+      av.textContent = username.charAt(0).toUpperCase();
+      av.className = `w-8 h-8 rounded-full bg-gradient-to-br ${avatarColor(username)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mb-0.5`;
+    }
+
+    document.getElementById('commentDrawer').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    loadFileComments();
+    setTimeout(() => document.getElementById('drawerInput').focus(), 200);
+  }
+
+  function closeCommentDrawer() {
+    document.getElementById('commentDrawer').classList.add('hidden');
+    document.body.style.overflow = '';
+    drawerFileId = null;
+    document.getElementById('drawerInput').value = '';
+    document.getElementById('drawerInput').style.height = 'auto';
+  }
+
+  async function loadFileComments() {
+    if (!drawerFileId || !currentProject) return;
+
+    document.getElementById('drawerLoading').classList.remove('hidden');
+    document.getElementById('drawerEmpty').classList.add('hidden');
+    document.getElementById('drawerComments').innerHTML = '';
+
+    try {
+      const res  = await api(`/api/projects/${currentProject.id}/files/${drawerFileId}/comments`);
+      const data = await res.json();
+      if (!res.ok) { showToast(data.message || 'Lỗi tải bình luận', 'error'); return; }
+
+      document.getElementById('drawerCommentCount').textContent =
+        data.length === 0 ? 'Chưa có bình luận' : `${data.length} bình luận`;
+
+      if (data.length === 0) {
+        document.getElementById('drawerEmpty').classList.remove('hidden');
+      } else {
+        renderFileComments(data);
+      }
+    } catch (e) {
+      showToast('Lỗi kết nối', 'error');
+    } finally {
+      document.getElementById('drawerLoading').classList.add('hidden');
+    }
+  }
+
+  function renderFileComments(comments) {
+    const container = document.getElementById('drawerComments');
+    container.innerHTML = comments.map(c => {
+      const isOwn   = c.username === username;
+      const isOwner = currentProject?.my_role === 'owner';
+      const canDel  = isOwn || isOwner;
+      const initials = (c.username || '?').charAt(0).toUpperCase();
+
+      return `<div class="flex gap-2.5 items-start group mb-3 fade-in" id="fc-${c.id}">
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br ${avatarColor(c.username)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">${initials}</div>
+        <div class="flex-1 min-w-0">
+          <div class="bg-gray-50 rounded-xl px-3 py-2.5">
+            <div class="flex items-center gap-1.5 mb-1 flex-wrap">
+              <span class="text-xs font-semibold text-gray-800">${escHtml(c.username)}</span>
+              ${isOwn ? '<span class="text-xs bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full leading-none">Bạn</span>' : ''}
+              <span class="text-xs text-gray-400 ml-auto">${formatDate(c.created_at)}</span>
+              ${canDel ? `<button onclick="deleteFileComment(${c.id})"
+                class="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-all" title="Xóa">
+                <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+              </button>` : ''}
+            </div>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap break-words leading-relaxed">${escHtml(c.content)}</p>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Scroll xuống cuối
+    const list = document.getElementById('drawerCommentsList');
+    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 50);
+    lucide.createIcons();
+  }
+
+  async function submitFileComment() {
+    const input   = document.getElementById('drawerInput');
+    const content = input.value.trim();
+    if (!content || !drawerFileId || !currentProject) return;
+
+    const btn = document.querySelector('#commentDrawer button[onclick="submitFileComment()"]');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+
+    try {
+      const res  = await api(`/api/projects/${currentProject.id}/files/${drawerFileId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content })
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.message || 'Lỗi gửi bình luận', 'error'); return; }
+
+      input.value = '';
+      input.style.height = 'auto';
+      await loadFileComments();
+    } catch (e) {
+      showToast('Lỗi kết nối', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      input.focus();
+    }
+  }
+
+  async function deleteFileComment(commentId) {
+    if (!currentProject || !drawerFileId) return;
+    if (!confirm('Xóa bình luận này?')) return;
+    try {
+      const res  = await api(`/api/projects/${currentProject.id}/files/${drawerFileId}/comments/${commentId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.message || 'Lỗi xóa', 'error'); return; }
+      showToast('Đã xóa bình luận');
+      await loadFileComments();
+    } catch (e) {
+      showToast('Lỗi kết nối', 'error');
+    }
+  }
+
+  function handleDrawerKeydown(e) {
+    if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); submitFileComment(); }
+  }
+
 </script>
 </body>
 </html>
