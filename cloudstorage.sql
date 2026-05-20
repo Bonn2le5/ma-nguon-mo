@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS files (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
-  filename VARCHAR(255) NOT NULL,        
-  original_name VARCHAR(255) NOT NULL,   
+  filename VARCHAR(255) NOT NULL,        -- tên file lưu trên disk (UUID)
+  original_name VARCHAR(255) NOT NULL,   -- tên file gốc hiển thị cho user
   file_size BIGINT NOT NULL,
   mime_type VARCHAR(100),
   folder_path VARCHAR(500) DEFAULT '/',
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS shares (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Tài khoản admin mặc định
 -- username: admin / password: admin123
 INSERT IGNORE INTO users (username, email, password, role, quota)
 VALUES (
@@ -145,6 +146,10 @@ CREATE INDEX idx_files_deleted   ON files (user_id, is_deleted);
 CREATE INDEX idx_files_favorite  ON files (user_id, is_favorite);
 CREATE INDEX idx_swu_recipient   ON shared_with_users (recipient_id);
 
+-- =====================================================
+-- MIGRATION: Thêm tính năng xác nhận email + reset mật khẩu
+-- Chạy file này 1 lần trong MySQL
+-- =====================================================
 
 -- 1. Thêm cột email_verified vào bảng users
 ALTER TABLE users
